@@ -1,0 +1,674 @@
+openapi: 3.0.3
+info:
+  title: Franchise Systems Ai API
+  version: 1.0.0
+  contact:
+    name: Developer Support
+    email: bill@franchisesystems.ai
+
+servers:
+  - url: https://v2.api.franchisesystems.ai/public
+    description: Production server
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /brands:
+    get:
+      summary: List all accessible brands
+      description: Retrieve a list of all brands that the authenticated agent has access to
+      operationId: listApiAccessBrands
+      tags:
+        - Brands
+      responses:
+        "200":
+          description: Successfully retrieved brands list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListApiAccessBrandsResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /states/status/{brandId}:
+    get:
+      summary: Get state franchising status for a brand
+      description: Retrieve the franchising status for all states for a specific brand
+      operationId: getStateFranchisingStatusForBrand
+      tags:
+        - States
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        "200":
+          description: Successfully retrieved state franchising status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StateFranchisingStatusResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /states/status/{brandId}/{stateId}:
+    post:
+      summary: Set actively franchising status
+      description: Update whether a brand is actively franchising in a specific state
+      operationId: setActivelyFranchising
+      tags:
+        - States
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+        - name: stateId
+          in: path
+          required: true
+          description: State identifier (US state abbreviation or Canadian province code)
+          schema:
+            $ref: "#/components/schemas/State"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - is_active
+              properties:
+                is_active:
+                  type: boolean
+                  description: Whether the brand is actively franchising in this state
+                  example: true
+      responses:
+        "200":
+          description: Successfully updated franchising status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Franchising status updated successfully"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /states/{brandId}/{stateId}:
+    get:
+      summary: Get state overview for a brand
+      description: Retrieve detailed state-specific information for a brand
+      operationId: getStateOverviewForBrand
+      tags:
+        - States
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+        - name: stateId
+          in: path
+          required: true
+          description: State identifier (US state abbreviation or Canadian province code)
+          schema:
+            $ref: "#/components/schemas/State"
+      responses:
+        "200":
+          description: Successfully retrieved state overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StateOverviewResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      summary: Update state overview for a brand
+      description: Update state-specific franchising information for a brand
+      operationId: updateStateOverviewForBrand
+      tags:
+        - States
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+        - name: stateId
+          in: path
+          required: true
+          description: State identifier (US state abbreviation or Canadian province code)
+          schema:
+            $ref: "#/components/schemas/State"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStateOverviewRequest"
+      responses:
+        "200":
+          description: Successfully updated state overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StateOverviewResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      description: |
+        API Key authentication using Bearer token format.
+        Include your API key in the Authorization header as: `Authorization: Bearer YOUR_API_KEY`
+
+  schemas:
+    State:
+      type: string
+      enum:
+        - ak
+        - al
+        - ar
+        - az
+        - ca
+        - co
+        - ct
+        - dc
+        - de
+        - fl
+        - ga
+        - hi
+        - ia
+        - id
+        - il
+        - in
+        - ks
+        - ky
+        - la
+        - ma
+        - md
+        - me
+        - mi
+        - mn
+        - mo
+        - ms
+        - mt
+        - nc
+        - nd
+        - ne
+        - nh
+        - nj
+        - nm
+        - nv
+        - ny
+        - oh
+        - ok
+        - or
+        - pa
+        - ri
+        - sc
+        - sd
+        - tn
+        - tx
+        - ut
+        - va
+        - vt
+        - wa
+        - wi
+        - wv
+        - wy
+        - usot_gu
+        - usot_as
+        - usot_nmi
+        - usot_pr
+        - usot_vi
+        - ca_nl
+        - ca_pe
+        - ca_ns
+        - ca_nb
+        - ca_qc
+        - ca_on
+        - ca_mb
+        - ca_sk
+        - ca_ab
+        - ca_bc
+        - ca_yt
+        - ca_nt
+        - ca_nu
+      description: State or province identifier (US states, territories, and Canadian provinces)
+      example: "ca"
+
+    StateRegistrationStatus:
+      type: string
+      enum:
+        - none
+        - pending
+        - active
+        - expired
+        - suspended
+      description: Current registration status in the state
+      example: "active"
+
+    AgreementFeeTimeframe:
+      type: string
+      enum:
+        - annually
+        - biannually
+        - monthly
+        - quarterly
+      description: Timeframe for fee payments
+      example: "annually"
+
+    Brand:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the brand
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        name:
+          type: string
+          description: Brand name
+          example: "Pizza Palace"
+        logoUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: URL to the brand's logo image
+          example: "https://example.com/logos/pizza-palace.png"
+
+    StateOverview:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for this brand-state record
+        created_at:
+          type: string
+          format: date-time
+          description: When this record was created
+        state:
+          $ref: "#/components/schemas/State"
+        brand_id:
+          type: string
+          format: uuid
+          description: UUID of the associated brand
+        max_locations:
+          type: number
+          nullable: true
+          description: Maximum number of locations allowed in this state
+          example: 50
+        registration_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the current registration expires
+        fdd_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the associated FDD document
+        fdd_filed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the FDD was filed
+        fdd_filing_required:
+          type: boolean
+          nullable: true
+          description: Whether FDD filing is required in this state
+        fdd_renewal_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: Deadline for FDD renewal
+        franchise_fee_collection_rules:
+          type: string
+          nullable: true
+          description: Rules governing franchise fee collection
+        governing_agency_address:
+          type: string
+          nullable: true
+          description: Address of the governing agency
+        governing_agency_email:
+          type: string
+          format: email
+          nullable: true
+          description: Email of the governing agency
+        governing_agency_name:
+          type: string
+          nullable: true
+          description: Name of the governing agency
+        governing_agency_phone:
+          type: string
+          nullable: true
+          description: Phone number of the governing agency
+        insurance_requirements:
+          type: string
+          nullable: true
+          description: Insurance requirements for franchisees
+        is_active:
+          type: boolean
+          nullable: true
+          description: Whether actively franchising in this state
+        other_notes:
+          type: string
+          nullable: true
+          description: Additional notes or comments
+        registration_agent:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the registration agent
+        registration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: Date of registration
+        registration_or_filing_fee:
+          type: number
+          nullable: true
+          description: Cost of registration or filing fee
+        registration_required:
+          type: boolean
+          nullable: true
+          description: Whether registration is required in this state
+        registration_status:
+          $ref: "#/components/schemas/StateRegistrationStatus"
+        renewal_fee:
+          type: number
+          nullable: true
+          description: Cost of renewal fee
+        renewal_fee_timeframe:
+          $ref: "#/components/schemas/AgreementFeeTimeframe"
+        special_state_addenda_requirements:
+          type: string
+          nullable: true
+          description: Special state-specific addenda requirements
+        surety_bond_requirements:
+          type: string
+          nullable: true
+          description: Surety bond requirements
+        trademark_requirements:
+          type: string
+          nullable: true
+          description: Trademark-related requirements
+        annual_renewal_information:
+          type: string
+          nullable: true
+          description: Information about annual renewal process
+        initial_registration_information:
+          type: string
+          nullable: true
+          description: Information about initial registration process
+        waiting_period_information:
+          type: string
+          nullable: true
+          description: Information about waiting periods
+
+    ListApiAccessBrandsResponse:
+      type: object
+      required:
+        - brands
+      properties:
+        brands:
+          type: array
+          items:
+            $ref: "#/components/schemas/Brand"
+          description: List of brands accessible to the authenticated agent
+
+    StateFranchisingStatusResponse:
+      type: object
+      description: Map of state IDs to their franchising status
+      additionalProperties:
+        type: boolean
+      example:
+        ca: true
+        ny: false
+        tx: true
+
+    StateOverviewResponse:
+      type: object
+      required:
+        - state
+      properties:
+        state:
+          allOf:
+            - $ref: "#/components/schemas/StateOverview"
+            - nullable: true
+          description: State overview information, null if no data exists
+
+    UpdateStateOverviewRequest:
+      type: object
+      properties:
+        max_locations:
+          type: number
+          nullable: true
+          description: Maximum number of locations allowed in this state
+        registration_expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the current registration expires
+        fdd_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the associated FDD document
+        fdd_filed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the FDD was filed
+        fdd_filing_required:
+          type: boolean
+          nullable: true
+          description: Whether FDD filing is required in this state
+        fdd_renewal_deadline:
+          type: string
+          format: date-time
+          nullable: true
+          description: Deadline for FDD renewal
+        franchise_fee_collection_rules:
+          type: string
+          nullable: true
+          description: Rules governing franchise fee collection
+        governing_agency_address:
+          type: string
+          nullable: true
+          description: Address of the governing agency
+        governing_agency_email:
+          type: string
+          format: email
+          nullable: true
+          description: Email of the governing agency
+        governing_agency_name:
+          type: string
+          nullable: true
+          description: Name of the governing agency
+        governing_agency_phone:
+          type: string
+          nullable: true
+          description: Phone number of the governing agency
+        insurance_requirements:
+          type: string
+          nullable: true
+          description: Insurance requirements for franchisees
+        is_active:
+          type: boolean
+          nullable: true
+          description: Whether actively franchising in this state
+        other_notes:
+          type: string
+          nullable: true
+          description: Additional notes or comments
+        registration_agent:
+          type: string
+          format: uuid
+          nullable: true
+          description: UUID of the registration agent
+        registration_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: Date of registration
+        registration_or_filing_fee:
+          type: number
+          nullable: true
+          description: Cost of registration or filing fee
+        registration_required:
+          type: boolean
+          nullable: true
+          description: Whether registration is required in this state
+        registration_status:
+          $ref: "#/components/schemas/StateRegistrationStatus"
+        renewal_fee:
+          type: number
+          nullable: true
+          description: Cost of renewal fee
+        renewal_fee_timeframe:
+          $ref: "#/components/schemas/AgreementFeeTimeframe"
+        special_state_addenda_requirements:
+          type: string
+          nullable: true
+          description: Special state-specific addenda requirements
+        surety_bond_requirements:
+          type: string
+          nullable: true
+          description: Surety bond requirements
+        trademark_requirements:
+          type: string
+          nullable: true
+          description: Trademark-related requirements
+        annual_renewal_information:
+          type: string
+          nullable: true
+          description: Information about annual renewal process
+        initial_registration_information:
+          type: string
+          nullable: true
+          description: Information about initial registration process
+        waiting_period_information:
+          type: string
+          nullable: true
+          description: Information about waiting periods
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid request"
+
+  responses:
+    UnauthorizedError:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          examples:
+            no_auth_header:
+              summary: No authentication header
+              value:
+                error: "No authentication header provided"
+            no_api_key:
+              summary: No API key in header
+              value:
+                error: "No apiKey provided in authentication header"
+            invalid_api_key:
+              summary: Invalid API key
+              value:
+                error: "Invalid apiKey provided in authentication header"
+            expired_api_key:
+              summary: Expired API key
+              value:
+                error: "Expired apiKey provided in authentication header. Please generate a new key from your Franchise Systems profile settings page"
+
+    BadRequestError:
+      description: Bad request - invalid input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Invalid request parameters"
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Resource not found"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Internal server error"
+
+tags:
+  - name: Brands
+    description: Operations related to franchise brands
+  - name: States
+    description: Operations related to state-specific franchise information
