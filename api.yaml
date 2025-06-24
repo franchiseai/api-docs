@@ -1,7 +1,50 @@
 openapi: 3.0.3
 info:
   title: Franchise Systems Ai API
-  version: 1.0.0
+  description: |
+    ## Authentication
+
+    All API endpoints require authentication using a Bearer token in the Authorization header:
+
+    ```
+    Authorization: Bearer YOUR_API_KEY
+    ```
+
+    ### Obtaining an API Key
+
+    To obtain an API key:
+    1. Log into [Franchise Systems Ai](https://app.franchisesystems.ai/).
+    2. Click your profile in the bottom left hand corner of the interface.
+    3. Select "Settings".
+    3. Generate a new API key at the bottom of the page.
+    4. Store it securely - API keys are only shown once.
+
+    ### API Key Management
+
+    - API keys are attached to individual accounts, and have all the same permissions as the account they are attached to.
+    - Only one key per account is valid at any given time.
+    - Keys can be revoked by generating a new one.
+
+    ## State Management Overview
+
+    The API manages franchise information across **69 jurisdictions**:
+
+    ### United States (51)
+     - Standard 2-letter state codes (e.g., `ca` = California, `ny` = New York)
+     - `dc` = Washington, District of Columbia
+
+    ### US Territories (5)
+    - Guam (`usot_gu`)
+    - American Samoa (`usot_as`) 
+    - Northern Mariana Islands (`usot_nmi`)
+    - Puerto Rico (`usot_pr`)
+    - US Virgin Islands (`usot_vi`)
+
+    ### Canadian Provinces & Territories (13)
+    - All 10 provinces: Newfoundland (`ca_nl`), Prince Edward Island (`ca_pe`), Nova Scotia (`ca_ns`), New Brunswick (`ca_nb`), Quebec (`ca_qc`), Ontario (`ca_on`), Manitoba (`ca_mb`), Saskatchewan (`ca_sk`), Alberta (`ca_ab`), British Columbia (`ca_bc`)
+    - All 3 territories: Yukon (`ca_yt`), Northwest Territories (`ca_nt`), Nunavut (`ca_nu`)
+
+  version: 0.2.1
   contact:
     name: Developer Support
     email: bill@franchisesystems.ai
@@ -11,13 +54,13 @@ servers:
     description: Production server
 
 security:
-  - ApiKeyAuth: []
+  - BearerAuth: []
 
 paths:
   /brands:
     get:
       summary: List all accessible brands
-      description: Retrieve a list of all brands that the authenticated agent has access to
+      description: Retrieve a list of all brands that the authenticated agent has access to. Ids returned should be referenced for usage in the "state" routes.
       operationId: listApiAccessBrands
       tags:
         - Brands
@@ -105,13 +148,6 @@ paths:
             application/json:
               schema:
                 type: object
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  message:
-                    type: string
-                    example: "Franchising status updated successfully"
         "400":
           $ref: "#/components/responses/BadRequestError"
         "401":
@@ -190,7 +226,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StateOverviewResponse"
+                type: object
         "400":
           $ref: "#/components/responses/BadRequestError"
         "401":
@@ -202,12 +238,15 @@ paths:
 
 components:
   securitySchemes:
-    ApiKeyAuth:
+    BearerAuth:
       type: http
-      scheme: bearer
+      scheme: Bearer
       description: |
-        API Key authentication using Bearer token format.
-        Include your API key in the Authorization header as: `Authorization: Bearer YOUR_API_KEY`
+        **API Key Authentication**
+
+        All endpoints require a valid API key passed as a Bearer token in the Authorization header.
+
+        **Format:** `Authorization: Bearer YOUR_API_KEY`
 
   schemas:
     State:
@@ -282,19 +321,15 @@ components:
         - ca_yt
         - ca_nt
         - ca_nu
-      description: State or province identifier (US states, territories, and Canadian provinces)
-      example: "ca"
 
     StateRegistrationStatus:
       type: string
       enum:
         - none
-        - pending
-        - active
-        - expired
-        - suspended
+        - filed_not_registered
+        - filed_registered
       description: Current registration status in the state
-      example: "active"
+      example: "none"
 
     AgreementFeeTimeframe:
       type: string
@@ -303,8 +338,62 @@ components:
         - biannually
         - monthly
         - quarterly
+        - yearly
       description: Timeframe for fee payments
-      example: "annually"
+      example: "yearly"
+
+    Agent:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the agent
+          example: "02b9c769-7f30-44b1-94d4-d2fed6eccf25"
+        firstName:
+          type: string
+          nullable: true
+          description: Agent's first name
+          example: "Bill"
+        lastName:
+          type: string
+          nullable: true
+          description: Agent's last name
+          example: "Smith"
+        profilePictureUrl:
+          type: string
+          nullable: true
+          description: URL or identifier for the agent's profile picture
+          example: "02b9c769d2fed6eccf25-1520767d-0949-4049-b826-36a7dcc26c0f"
+
+    FDD:
+      type: object
+      required:
+        - id
+        - title
+        - prepared
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the FDD document
+          example: "fdd123e4-567e-89ab-cdef-123456789abc"
+        title:
+          type: string
+          description: Title of the FDD document
+          example: "Pizza Palace Franchise Disclosure Document"
+        prepared:
+          type: boolean
+          description: Whether the FDD document has been prepared
+          example: true
+        date_last_modified:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the FDD was last modified
+          example: "2025-05-15T14:30:00+00:00"
 
     Brand:
       type: object
@@ -335,128 +424,163 @@ components:
           type: string
           format: uuid
           description: Unique identifier for this brand-state record
+          example: "8fa6dbc4-edc6-404f-8f0b-6e8eb5057706"
         created_at:
           type: string
           format: date-time
           description: When this record was created
+          example: "2025-05-22T09:45:30.684915+00:00"
         state:
           $ref: "#/components/schemas/State"
         brand_id:
           type: string
           format: uuid
           description: UUID of the associated brand
+          example: "22a7b17b-6d95-4f7d-bc90-a687fcaeeab3"
         max_locations:
           type: number
           nullable: true
           description: Maximum number of locations allowed in this state
-          example: 50
+          example: null
         registration_expires_at:
           type: string
           format: date-time
           nullable: true
           description: When the current registration expires
-        fdd_id:
-          type: string
-          format: uuid
-          nullable: true
-          description: UUID of the associated FDD document
+          example: "2025-05-03T21:00:00+00:00"
         fdd_filed_at:
           type: string
           format: date-time
           nullable: true
           description: When the FDD was filed
+          example: "2025-05-04T21:00:00+00:00"
         fdd_filing_required:
           type: boolean
           nullable: true
           description: Whether FDD filing is required in this state
+          example: true
         fdd_renewal_deadline:
           type: string
           format: date-time
           nullable: true
           description: Deadline for FDD renewal
+          example: "2025-05-02T21:00:00+00:00"
         franchise_fee_collection_rules:
           type: string
           nullable: true
           description: Rules governing franchise fee collection
+          example: "No general escrow requirement, but DFPI may impose escrow or fee deferral as a condition if franchisor's financials or experience are deficient (merit review) . Otherwise no escrow if no condition."
         governing_agency_address:
           type: string
           nullable: true
           description: Address of the governing agency
+          example: "2101 Arena Blvd, Sacramento, CA 95834"
         governing_agency_email:
           type: string
           format: email
           nullable: true
           description: Email of the governing agency
+          example: "postman@testing.com"
         governing_agency_name:
           type: string
           nullable: true
           description: Name of the governing agency
+          example: "California Department of Financial Protection & Innovation"
         governing_agency_phone:
           type: string
           nullable: true
           description: Phone number of the governing agency
+          example: "(866) 275-2677"
         insurance_requirements:
           type: string
           nullable: true
           description: Insurance requirements for franchisees
+          example: "No state-imposed insurance requirements (aside from disclosure of any franchisee insurance obligations in FDD)."
         is_active:
           type: boolean
           nullable: true
           description: Whether actively franchising in this state
+          example: true
         other_notes:
           type: string
           nullable: true
           description: Additional notes or comments
+          example: "California requires delivering the FDD 14 days before sale (FTC rule) and also a 5-day contract review period if the franchise agreement is given at signing (Cal. Corp. Code §31119). Franchise brokers must be disclosed and may need to register."
         registration_agent:
           type: string
           format: uuid
           nullable: true
-          description: UUID of the registration agent
+          description: UUID reference to the registration agent
+          example: "02b9c769-7f30-44b1-94d4-d2fed6eccf25"
         registration_date:
           type: string
           format: date-time
           nullable: true
           description: Date of registration
+          example: "2025-05-14T21:00:00+00:00"
         registration_or_filing_fee:
           type: number
           nullable: true
           description: Cost of registration or filing fee
+          example: 123123
         registration_required:
           type: boolean
           nullable: true
           description: Whether registration is required in this state
+          example: true
         registration_status:
           $ref: "#/components/schemas/StateRegistrationStatus"
         renewal_fee:
           type: number
           nullable: true
           description: Cost of renewal fee
+          example: null
         renewal_fee_timeframe:
           $ref: "#/components/schemas/AgreementFeeTimeframe"
         special_state_addenda_requirements:
           type: string
           nullable: true
           description: Special state-specific addenda requirements
+          example: "Yes – Must include California State Cover Page with specific cautions and legends in the FDD, and any required state addenda (e.g. California-specific disclosures) ."
         surety_bond_requirements:
           type: string
           nullable: true
           description: Surety bond requirements
+          example: "No general requirement (however, DFPI may accept a surety bond in lieu of escrow for conditional registrations)."
         trademark_requirements:
           type: string
           nullable: true
           description: Trademark-related requirements
+          example: "No (California does not mandate a federally registered trademark for registration or exemption; state has separate \"trade name\" exemption §31111 for marketing plan license arrangements, not commonly used)."
         annual_renewal_information:
           type: string
           nullable: true
           description: Information about annual renewal process
+          example: null
         initial_registration_information:
           type: string
           nullable: true
           description: Information about initial registration process
+          example: null
         waiting_period_information:
           type: string
           nullable: true
           description: Information about waiting periods
+          example: "Yo, just testing"
+        registrationAgent:
+          allOf:
+            - $ref: "#/components/schemas/Agent"
+            - nullable: true
+          description: Registration agent information
+        fdd:
+          allOf:
+            - $ref: "#/components/schemas/FDD"
+            - nullable: true
+          description: FDD document information
+        locations:
+          type: integer
+          description: Number of locations for this brand in this state
+          example: 1
 
     ListApiAccessBrandsResponse:
       type: object
@@ -471,13 +595,293 @@ components:
 
     StateFranchisingStatusResponse:
       type: object
-      description: Map of state IDs to their franchising status
-      additionalProperties:
-        type: boolean
+      description: |
+        Complete map of all supported states/territories to their franchising status for the specified brand.
+
+        Returns a boolean value for each of the 69 supported jurisdictions indicating whether the brand is actively franchising in that location.
+
+        - `true` = Brand is actively franchising in this state/territory
+        - `false` = Brand is not actively franchising in this state/territory
+
+        **Note:** All 69 jurisdictions are always included in the response, even if the brand has no presence in that location.
+      properties:
+        ak:
+          type: boolean
+          description: Alaska
+        al:
+          type: boolean
+          description: Alabama
+        ar:
+          type: boolean
+          description: Arkansas
+        az:
+          type: boolean
+          description: Arizona
+        ca:
+          type: boolean
+          description: California
+        co:
+          type: boolean
+          description: Colorado
+        ct:
+          type: boolean
+          description: Connecticut
+        dc:
+          type: boolean
+          description: Washington, District of Columbia
+        de:
+          type: boolean
+          description: Delaware
+        fl:
+          type: boolean
+          description: Florida
+        ga:
+          type: boolean
+          description: Georgia
+        hi:
+          type: boolean
+          description: Hawaii
+        ia:
+          type: boolean
+          description: Iowa
+        id:
+          type: boolean
+          description: Idaho
+        il:
+          type: boolean
+          description: Illinois
+        in:
+          type: boolean
+          description: Indiana
+        ks:
+          type: boolean
+          description: Kansas
+        ky:
+          type: boolean
+          description: Kentucky
+        la:
+          type: boolean
+          description: Louisiana
+        ma:
+          type: boolean
+          description: Massachusetts
+        md:
+          type: boolean
+          description: Maryland
+        me:
+          type: boolean
+          description: Maine
+        mi:
+          type: boolean
+          description: Michigan
+        mn:
+          type: boolean
+          description: Minnesota
+        mo:
+          type: boolean
+          description: Missouri
+        ms:
+          type: boolean
+          description: Mississippi
+        mt:
+          type: boolean
+          description: Montana
+        nc:
+          type: boolean
+          description: North Carolina
+        nd:
+          type: boolean
+          description: North Dakota
+        ne:
+          type: boolean
+          description: Nebraska
+        nh:
+          type: boolean
+          description: New Hampshire
+        nj:
+          type: boolean
+          description: New Jersey
+        nm:
+          type: boolean
+          description: New Mexico
+        nv:
+          type: boolean
+          description: Nevada
+        ny:
+          type: boolean
+          description: New York
+        oh:
+          type: boolean
+          description: Ohio
+        ok:
+          type: boolean
+          description: Oklahoma
+        or:
+          type: boolean
+          description: Oregon
+        pa:
+          type: boolean
+          description: Pennsylvania
+        ri:
+          type: boolean
+          description: Rhode Island
+        sc:
+          type: boolean
+          description: South Carolina
+        sd:
+          type: boolean
+          description: South Dakota
+        tn:
+          type: boolean
+          description: Tennessee
+        tx:
+          type: boolean
+          description: Texas
+        ut:
+          type: boolean
+          description: Utah
+        va:
+          type: boolean
+          description: Virginia
+        vt:
+          type: boolean
+          description: Vermont
+        wa:
+          type: boolean
+          description: Washington
+        wi:
+          type: boolean
+          description: Wisconsin
+        wv:
+          type: boolean
+          description: West Virginia
+        wy:
+          type: boolean
+          description: Wyoming
+        usot_gu:
+          type: boolean
+          description: Guam
+        usot_as:
+          type: boolean
+          description: American Samoa
+        usot_nmi:
+          type: boolean
+          description: Northern Mariana Islands
+        usot_pr:
+          type: boolean
+          description: Puerto Rico
+        usot_vi:
+          type: boolean
+          description: US Virgin Islands
+        ca_nl:
+          type: boolean
+          description: Newfoundland and Labrador
+        ca_pe:
+          type: boolean
+          description: Prince Edward Island
+        ca_ns:
+          type: boolean
+          description: Nova Scotia
+        ca_nb:
+          type: boolean
+          description: New Brunswick
+        ca_qc:
+          type: boolean
+          description: Quebec
+        ca_on:
+          type: boolean
+          description: Ontario
+        ca_mb:
+          type: boolean
+          description: Manitoba
+        ca_sk:
+          type: boolean
+          description: Saskatchewan
+        ca_ab:
+          type: boolean
+          description: Alberta
+        ca_bc:
+          type: boolean
+          description: British Columbia
+        ca_yt:
+          type: boolean
+          description: Yukon
+        ca_nt:
+          type: boolean
+          description: Northwest Territories
+        ca_nu:
+          type: boolean
+          description: Nunavut
       example:
+        ak: false
+        al: true
+        ar: false
+        az: true
         ca: true
+        co: false
+        ct: false
+        dc: false
+        de: false
+        fl: false
+        ga: false
+        hi: false
+        ia: false
+        id: false
+        il: false
+        in: false
+        ks: false
+        ky: false
+        la: false
+        ma: false
+        md: false
+        me: false
+        mi: false
+        mn: false
+        mo: false
+        ms: false
+        mt: false
+        nc: false
+        nd: false
+        ne: false
+        nh: false
+        nj: false
+        nm: false
+        nv: false
         ny: false
-        tx: true
+        oh: false
+        ok: false
+        or: false
+        pa: false
+        ri: false
+        sc: false
+        sd: false
+        tn: false
+        tx: false
+        ut: false
+        va: false
+        vt: false
+        wa: false
+        wi: false
+        wv: false
+        wy: false
+        usot_gu: false
+        usot_as: false
+        usot_nmi: false
+        usot_pr: false
+        usot_vi: false
+        ca_nl: false
+        ca_pe: false
+        ca_ns: false
+        ca_nb: false
+        ca_qc: false
+        ca_on: false
+        ca_mb: false
+        ca_sk: false
+        ca_ab: false
+        ca_bc: false
+        ca_yt: false
+        ca_nt: false
+        ca_nu: false
 
     StateOverviewResponse:
       type: object
@@ -489,6 +893,7 @@ components:
             - $ref: "#/components/schemas/StateOverview"
             - nullable: true
           description: State overview information, null if no data exists
+      
 
     UpdateStateOverviewRequest:
       type: object
@@ -502,11 +907,6 @@ components:
           format: date-time
           nullable: true
           description: When the current registration expires
-        fdd_id:
-          type: string
-          format: uuid
-          nullable: true
-          description: UUID of the associated FDD document
         fdd_filed_at:
           type: string
           format: date-time
@@ -546,19 +946,10 @@ components:
           type: string
           nullable: true
           description: Insurance requirements for franchisees
-        is_active:
-          type: boolean
-          nullable: true
-          description: Whether actively franchising in this state
         other_notes:
           type: string
           nullable: true
           description: Additional notes or comments
-        registration_agent:
-          type: string
-          format: uuid
-          nullable: true
-          description: UUID of the registration agent
         registration_date:
           type: string
           format: date-time
@@ -669,6 +1060,5 @@ components:
 
 tags:
   - name: Brands
-    description: Operations related to franchise brands
   - name: States
-    description: Operations related to state-specific franchise information
+    description: Operations related to brand and state specific franchising information
