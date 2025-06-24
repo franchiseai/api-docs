@@ -552,6 +552,24 @@ data-styled.g138[id="sc-enPhjR"]{content:"SikXG,"}/*!sc*/
       Redoc.hydrate(__redoc_state, container);
 
       </script>
+
+    <script id="live-reload-script">
+      (function() {
+        const ws = new WebSocket('ws://localhost:3005');
+        ws.onmessage = function(event) {
+          if (event.data === 'reload') {
+            console.log('🔄 Reloading page due to file changes...');
+            window.location.reload();
+          }
+        };
+        ws.onopen = function() {
+          console.log('📡 Connected to live reload server');
+        };
+        ws.onerror = function() {
+          console.log('❌ Live reload connection failed');
+        };
+      })();
+    </script>
 </body>
 
 </html>

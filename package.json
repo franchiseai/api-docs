@@ -1,0 +1,25 @@
+{
+  "name": "openapi",
+  "version": "1.0.0",
+  "description": "FSAI OpenAPI docs",
+  "main": "index.js",
+  "scripts": {
+    "build": "npx @redocly/cli build-docs api.yaml --output index.html",
+    "dev": "node dev-server.js",
+    "start": "npm run build && npm run dev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com:franchiseai/api-docs.git"
+  },
+  "author": "bill0x2a",
+  "license": "ISC",
+  "dependencies": {
+    "@redocly/cli": "^1.0.0",
+    "ws": "^8.0.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
