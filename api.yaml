@@ -25,6 +25,10 @@ info:
     - Only one key per account is valid at any given time.
     - Keys can be revoked by generating a new one.
 
+    ### Rate Limiting
+     - A general purpose rate limit of 1000 requests per 15 minute period is applied to this API
+     - If this does not meet your needs, please reach out for support
+
     ## State Management Overview
 
     The API manages franchise information across **69 jurisdictions**:
