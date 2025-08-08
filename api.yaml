@@ -240,6 +240,50 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /states/{brandId}/{stateId}/activity:
+    post:
+      summary: Update state filing activity for a brand
+      description: Update the filing activity records for a specific brand-state combination
+      operationId: updateStateFilingActivity
+      tags:
+        - States
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+        - name: stateId
+          in: path
+          required: true
+          description: State identifier (US state abbreviation or Canadian province code)
+          schema:
+            $ref: "#/components/schemas/State"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStateFilingActivityRequest"
+      responses:
+        "200":
+          description: Successfully updated filing activity
+          content:
+            application/json:
+              schema:
+                type: object
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     BearerAuth:
@@ -421,6 +465,32 @@ components:
           description: URL to the brand's logo image
           example: "https://example.com/logos/pizza-palace.png"
 
+    FilingActivity:
+      type: object
+      required:
+        - headline
+        - date
+        - active
+      properties:
+        headline:
+          type: string
+          description: Brief headline describing the filing activity
+          example: "FDD Filed with State Agency"
+        description:
+          type: string
+          nullable: true
+          description: Detailed description of the filing activity
+          example: "Franchise Disclosure Document successfully filed with California Department of Financial Protection & Innovation"
+        date:
+          type: string
+          format: date-time
+          description: Date and time of the filing activity
+          example: "2025-05-15T14:30:00+00:00"
+        active:
+          type: boolean
+          description: Whether this filing activity record is currently active
+          example: true
+
     StateOverview:
       type: object
       properties:
@@ -571,6 +641,57 @@ components:
           nullable: true
           description: Information about waiting periods
           example: "Yo, just testing"
+        fdd_comment_letters:
+          type: number
+          nullable: true
+          description: Number of comment letters received for FDD
+          example: 2
+        fdd_filing_duration_days:
+          type: number
+          nullable: true
+          description: Duration in days for FDD filing process
+          example: 30
+        financial_assurance:
+          type: string
+          nullable: true
+          description: Financial assurance requirements
+          example: "Surety bond or escrow account required"
+        general_information:
+          type: string
+          nullable: true
+          description: General information and notes
+          example: "Additional state-specific franchise requirements"
+        is_action_required:
+          type: boolean
+          nullable: true
+          description: Whether action is required for this state
+          example: true
+        legal_representative_email:
+          type: string
+          format: email
+          nullable: true
+          description: Email of the legal representative
+          example: "legal@example.com"
+        legal_representative_first_name:
+          type: string
+          nullable: true
+          description: First name of the legal representative
+          example: "John"
+        legal_representative_last_name:
+          type: string
+          nullable: true
+          description: Last name of the legal representative
+          example: "Smith"
+        legal_representative_phone:
+          type: string
+          nullable: true
+          description: Phone number of the legal representative
+          example: "(555) 123-4567"
+        legal_representative_role:
+          type: string
+          nullable: true
+          description: Role/title of the legal representative
+          example: "General Counsel"
         registrationAgent:
           allOf:
             - $ref: "#/components/schemas/Agent"
@@ -585,6 +706,20 @@ components:
           type: integer
           description: Number of locations for this brand in this state
           example: 1
+        filing_activity:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilingActivity"
+          description: List of filing activities for this brand-state combination
+          example:
+            - date: "2025-05-15T14:30:00+00:00"
+              headline: "FDD Filed with State Agency"
+              description: "Franchise Disclosure Document successfully filed with California Department of Financial Protection & Innovation"
+              active: true
+            - date: "2025-03-10T09:15:00+00:00"
+              headline: "Registration Renewal Submitted"
+              description: "Annual registration renewal application submitted"
+              active: true
 
     ListApiAccessBrandsResponse:
       type: object
@@ -999,6 +1134,67 @@ components:
           type: string
           nullable: true
           description: Information about waiting periods
+        fdd_comment_letters:
+          type: number
+          nullable: true
+          description: Number of comment letters received for FDD
+        fdd_filing_duration_days:
+          type: number
+          nullable: true
+          description: Duration in days for FDD filing process
+        financial_assurance:
+          type: string
+          nullable: true
+          description: Financial assurance requirements
+        general_information:
+          type: string
+          nullable: true
+          description: General information and notes
+        is_action_required:
+          type: boolean
+          nullable: true
+          description: Whether action is required for this state
+        legal_representative_email:
+          type: string
+          format: email
+          nullable: true
+          description: Email of the legal representative
+        legal_representative_first_name:
+          type: string
+          nullable: true
+          description: First name of the legal representative
+        legal_representative_last_name:
+          type: string
+          nullable: true
+          description: Last name of the legal representative
+        legal_representative_phone:
+          type: string
+          nullable: true
+          description: Phone number of the legal representative
+        legal_representative_role:
+          type: string
+          nullable: true
+          description: Role/title of the legal representative
+
+    UpdateStateFilingActivityRequest:
+      type: object
+      required:
+        - activity
+      properties:
+        activity:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilingActivity"
+          description: Array of filing activities to update for the brand-state combination
+          example:
+            - headline: "FDD Filed with State Agency"
+              description: "Franchise Disclosure Document successfully filed with California Department of Financial Protection & Innovation"
+              date: "2025-05-15T14:30:00+00:00"
+              active: true
+            - headline: "Registration Renewal Submitted"
+              description: "Annual registration renewal application submitted"
+              date: "2025-03-10T09:15:00+00:00"
+              active: true
 
     Error:
       type: object
