@@ -1185,7 +1185,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FilingActivity"
-          description: Array of filing activities to update for the brand-state combination
+          description: |
+            Array of filing activities to update for the brand-state combination.
+            Note: This operation completely replaces all existing filing activities with the provided array.
+            The entire activity array must always be passed, as the previous activity records will be wiped and reset with what is provided here.
           example:
             - headline: "FDD Filed with State Agency"
               description: "Franchise Disclosure Document successfully filed with California Department of Financial Protection & Innovation"
@@ -1195,7 +1198,7 @@ components:
               description: "Annual registration renewal application submitted"
               date: "2025-03-10T09:15:00+00:00"
               active: true
-
+              
     Error:
       type: object
       required:
