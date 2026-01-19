@@ -48,7 +48,7 @@ info:
     - All 10 provinces: Newfoundland (`ca_nl`), Prince Edward Island (`ca_pe`), Nova Scotia (`ca_ns`), New Brunswick (`ca_nb`), Quebec (`ca_qc`), Ontario (`ca_on`), Manitoba (`ca_mb`), Saskatchewan (`ca_sk`), Alberta (`ca_ab`), British Columbia (`ca_bc`)
     - All 3 territories: Yukon (`ca_yt`), Northwest Territories (`ca_nt`), Nunavut (`ca_nu`)
 
-  version: 0.2.1
+  version: 0.3.0
   contact:
     name: Developer Support
     email: bill@franchisesystems.ai
@@ -275,6 +275,89 @@ paths:
             application/json:
               schema:
                 type: object
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /states/{brandId}/bulk:
+    post:
+      summary: Bulk update states for a brand
+      description: |
+        Update multiple states for a single brand in one transactional operation.
+
+        **Transaction Behavior:** All updates are applied within a single database transaction.
+        If any update fails, the entire operation is rolled back and no changes are persisted.
+
+        **Validation:** All state updates are validated before the transaction begins.
+        If validation fails for any state, detailed error messages are returned with indices for easy identification.
+      operationId: bulkUpdateStatesForBrand
+      tags:
+        - States
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkUpdateStatesForBrandRequest"
+      responses:
+        "200":
+          description: Successfully updated all states
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkUpdateStatesForBrandResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /states/bulk:
+    post:
+      summary: Bulk update states across multiple brands
+      description: |
+        Update states for multiple brands in one transactional operation.
+
+        **Transaction Behavior:** All updates across all brands are applied within a single database transaction.
+        If any update fails for any brand, the entire operation is rolled back and no changes are persisted.
+
+        **Validation:** All state updates for all brands are validated before the transaction begins.
+        If validation fails for any state in any brand, detailed error messages are returned with brand IDs and indices for easy identification.
+
+        **Authorization:** The authenticated user must have write access to all brands in the request.
+      operationId: bulkUpdateStatesMultiBrand
+      tags:
+        - States
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkUpdateStatesMultiBrandRequest"
+      responses:
+        "200":
+          description: Successfully updated all states for all brands
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkUpdateStatesMultiBrandResponse"
         "400":
           $ref: "#/components/responses/BadRequestError"
         "401":
@@ -1198,7 +1281,148 @@ components:
               description: "Annual registration renewal application submitted"
               date: "2025-03-10T09:15:00+00:00"
               active: true
-              
+
+    StateUpdateItem:
+      type: object
+      required:
+        - state_id
+        - updates
+      properties:
+        state_id:
+          $ref: "#/components/schemas/State"
+        updates:
+          $ref: "#/components/schemas/UpdateStateOverviewRequest"
+      description: A single state update containing the state identifier and the fields to update
+
+    BulkUpdateStatesForBrandRequest:
+      type: object
+      required:
+        - states
+      properties:
+        states:
+          type: array
+          items:
+            $ref: "#/components/schemas/StateUpdateItem"
+          minItems: 1
+          maxItems: 51
+          description: Array of state updates (maximum 51 states - all US states, DC, territories, and Canadian provinces)
+      example:
+        states:
+          - state_id: "ca"
+            updates:
+              registration_required: true
+              fdd_filing_required: true
+              registration_status: "filed_registered"
+          - state_id: "ny"
+            updates:
+              registration_required: true
+              fdd_filing_required: false
+              registration_or_filing_fee: 750
+
+    BulkUpdateStatesForBrandResponse:
+      type: object
+      required:
+        - updated
+        - state_ids
+      properties:
+        updated:
+          type: integer
+          description: Number of states successfully updated
+          example: 2
+        state_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/State"
+          description: List of state IDs that were updated
+          example: ["ca", "ny"]
+
+    BrandStateUpdateItem:
+      type: object
+      required:
+        - brand_id
+        - states
+      properties:
+        brand_id:
+          type: string
+          format: uuid
+          description: UUID of the brand to update
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        states:
+          type: array
+          items:
+            $ref: "#/components/schemas/StateUpdateItem"
+          minItems: 1
+          maxItems: 51
+          description: Array of state updates for this brand
+
+    BulkUpdateStatesMultiBrandRequest:
+      type: object
+      required:
+        - brands
+      properties:
+        brands:
+          type: array
+          items:
+            $ref: "#/components/schemas/BrandStateUpdateItem"
+          minItems: 1
+          maxItems: 50
+          description: Array of brand updates (maximum 50 brands)
+      example:
+        brands:
+          - brand_id: "123e4567-e89b-12d3-a456-426614174000"
+            states:
+              - state_id: "ca"
+                updates:
+                  registration_required: true
+                  fdd_filing_required: true
+          - brand_id: "987fcdeb-51a2-3b4c-d5e6-789012345678"
+            states:
+              - state_id: "tx"
+                updates:
+                  registration_required: false
+              - state_id: "fl"
+                updates:
+                  registration_required: false
+
+    BrandUpdateResult:
+      type: object
+      required:
+        - brand_id
+        - state_ids
+      properties:
+        brand_id:
+          type: string
+          format: uuid
+          description: UUID of the brand that was updated
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        state_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/State"
+          description: List of state IDs that were updated for this brand
+          example: ["ca", "ny"]
+
+    BulkUpdateStatesMultiBrandResponse:
+      type: object
+      required:
+        - updated
+        - results
+      properties:
+        updated:
+          type: integer
+          description: Total number of states updated across all brands
+          example: 4
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/BrandUpdateResult"
+          description: Per-brand breakdown of updated states
+          example:
+            - brand_id: "123e4567-e89b-12d3-a456-426614174000"
+              state_ids: ["ca"]
+            - brand_id: "987fcdeb-51a2-3b4c-d5e6-789012345678"
+              state_ids: ["tx", "fl"]
+
     Error:
       type: object
       required:
