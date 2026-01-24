@@ -284,6 +284,56 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /states/{brandId}/activity/bulk:
+    post:
+      summary: Bulk update filing activities for multiple states
+      description: |
+        Update filing activity records for multiple states of a single brand in one transactional operation.
+
+        **Modes:**
+        - `replace` (default): Replaces all existing activities for each state with the provided activities
+        - `append`: Adds new activities to existing ones without deleting
+
+        **Mode Resolution:**
+        - Request-level `mode` applies to all states unless overridden
+        - Per-state `mode` overrides the request-level mode for that specific state
+
+        **Transaction Behavior:** All updates are applied within a single database transaction.
+        If any update fails, the entire operation is rolled back and no changes are persisted.
+      operationId: bulkUpdateFilingActivityForBrand
+      tags:
+        - States
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkUpdateFilingActivityForBrandRequest"
+      responses:
+        "200":
+          description: Successfully updated filing activities for all states
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkUpdateFilingActivityForBrandResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /states/{brandId}/bulk:
     post:
       summary: Bulk update states for a brand
@@ -1281,6 +1331,82 @@ components:
               description: "Annual registration renewal application submitted"
               date: "2025-03-10T09:15:00+00:00"
               active: true
+
+    FilingActivityMode:
+      type: string
+      enum:
+        - replace
+        - append
+      description: |
+        Mode for updating filing activities:
+        - `replace`: Delete all existing activities and insert new ones
+        - `append`: Add new activities without removing existing ones
+      example: "replace"
+
+    StateFilingActivityUpdateItem:
+      type: object
+      required:
+        - state_id
+        - activity
+      properties:
+        state_id:
+          $ref: "#/components/schemas/State"
+        mode:
+          $ref: "#/components/schemas/FilingActivityMode"
+        activity:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilingActivity"
+          description: Array of filing activities for this state
+      description: A single state's filing activity update
+
+    BulkUpdateFilingActivityForBrandRequest:
+      type: object
+      required:
+        - states
+      properties:
+        mode:
+          $ref: "#/components/schemas/FilingActivityMode"
+        states:
+          type: array
+          items:
+            $ref: "#/components/schemas/StateFilingActivityUpdateItem"
+          minItems: 1
+          maxItems: 51
+          description: Array of state filing activity updates (maximum 51 states)
+      example:
+        mode: "replace"
+        states:
+          - state_id: "ca"
+            activity:
+              - headline: "FDD Filed with State Agency"
+                description: "Filed with California DFPI"
+                date: "2025-05-15T14:30:00+00:00"
+                active: true
+          - state_id: "ny"
+            mode: "append"
+            activity:
+              - headline: "Registration Renewal Submitted"
+                description: "Annual renewal submitted"
+                date: "2025-03-10T09:15:00+00:00"
+                active: true
+
+    BulkUpdateFilingActivityForBrandResponse:
+      type: object
+      required:
+        - updated
+        - state_ids
+      properties:
+        updated:
+          type: integer
+          description: Number of states successfully updated
+          example: 2
+        state_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/State"
+          description: List of state IDs that were updated
+          example: ["ca", "ny"]
 
     StateUpdateItem:
       type: object
