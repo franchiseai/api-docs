@@ -334,6 +334,83 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /states/{brandId}/activity:
+    get:
+      summary: Get all filing activities for a brand
+      description: |
+        Retrieve all filing activities across all states for a specific brand.
+
+        Returns a list of states with their associated filing activities.
+        Only states that have filing activity records are included in the response.
+      operationId: getAllFilingActivitiesForBrand
+      tags:
+        - States
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        "200":
+          description: Successfully retrieved all filing activities
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetAllFilingActivitiesResponse"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /states/{brandId}:
+    get:
+      summary: Get all states overview for a brand
+      description: |
+        Retrieve state overview information for all or specified states for a brand.
+
+        Use the optional `state_ids` query parameter to filter results to specific states.
+        If `state_ids` is not provided, returns all states that have records for the brand.
+      operationId: getStatesOverviewForBrand
+      tags:
+        - States
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+        - name: state_ids
+          in: query
+          required: false
+          description: Comma-separated list of state codes to filter results (e.g., "ca,ny,tx")
+          schema:
+            type: string
+            example: "ca,ny,tx"
+      responses:
+        "200":
+          description: Successfully retrieved states overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetStatesOverviewResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /states/{brandId}/bulk:
     post:
       summary: Bulk update states for a brand
@@ -1372,8 +1449,8 @@ components:
           items:
             $ref: "#/components/schemas/StateFilingActivityUpdateItem"
           minItems: 1
-          maxItems: 51
-          description: Array of state filing activity updates (maximum 51 states)
+          maxItems: 69
+          description: Array of state filing activity updates (maximum 69 jurisdictions)
       example:
         mode: "replace"
         states:
@@ -1430,8 +1507,8 @@ components:
           items:
             $ref: "#/components/schemas/StateUpdateItem"
           minItems: 1
-          maxItems: 51
-          description: Array of state updates (maximum 51 states - all US states, DC, territories, and Canadian provinces)
+          maxItems: 69
+          description: Array of state updates (maximum 69 jurisdictions - all US states, DC, territories, and Canadian provinces)
       example:
         states:
           - state_id: "ca"
@@ -1478,8 +1555,8 @@ components:
           items:
             $ref: "#/components/schemas/StateUpdateItem"
           minItems: 1
-          maxItems: 51
-          description: Array of state updates for this brand
+          maxItems: 69
+          description: Array of state updates for this brand (maximum 69 jurisdictions)
 
     BulkUpdateStatesMultiBrandRequest:
       type: object
@@ -1548,6 +1625,68 @@ components:
               state_ids: ["ca"]
             - brand_id: "987fcdeb-51a2-3b4c-d5e6-789012345678"
               state_ids: ["tx", "fl"]
+
+    StateFilingActivityItem:
+      type: object
+      required:
+        - state_id
+        - filing_activity
+      properties:
+        state_id:
+          $ref: "#/components/schemas/State"
+        filing_activity:
+          type: array
+          items:
+            $ref: "#/components/schemas/FilingActivity"
+          description: List of filing activities for this state
+      description: Filing activities for a specific state
+
+    GetAllFilingActivitiesResponse:
+      type: object
+      required:
+        - activities
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: "#/components/schemas/StateFilingActivityItem"
+          description: List of states with their filing activities
+      example:
+        activities:
+          - state_id: "ca"
+            filing_activity:
+              - headline: "FDD Filed"
+                description: "Filed with California DFPI"
+                date: "2025-05-15T14:30:00+00:00"
+                active: true
+          - state_id: "ny"
+            filing_activity:
+              - headline: "Registration Renewal"
+                description: "Annual renewal submitted"
+                date: "2025-03-10T09:15:00+00:00"
+                active: true
+
+    GetStatesOverviewResponse:
+      type: object
+      required:
+        - states
+      properties:
+        states:
+          type: array
+          items:
+            $ref: "#/components/schemas/StateOverview"
+          description: List of state overview objects
+      example:
+        states:
+          - id: "8fa6dbc4-edc6-404f-8f0b-6e8eb5057706"
+            created_at: "2025-05-22T09:45:30.684915+00:00"
+            state: "ca"
+            brand_id: "22a7b17b-6d95-4f7d-bc90-a687fcaeeab3"
+            is_active: true
+            registration_required: true
+            fdd_filing_required: true
+            locations: 5
+            filing_activity: []
 
     Error:
       type: object
