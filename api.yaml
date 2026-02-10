@@ -48,7 +48,7 @@ info:
     - All 10 provinces: Newfoundland (`ca_nl`), Prince Edward Island (`ca_pe`), Nova Scotia (`ca_ns`), New Brunswick (`ca_nb`), Quebec (`ca_qc`), Ontario (`ca_on`), Manitoba (`ca_mb`), Saskatchewan (`ca_sk`), Alberta (`ca_ab`), British Columbia (`ca_bc`)
     - All 3 territories: Yukon (`ca_yt`), Northwest Territories (`ca_nt`), Nunavut (`ca_nu`)
 
-  version: 0.3.0
+  version: 0.4.0
   contact:
     name: Developer Support
     email: bill@franchisesystems.ai
@@ -487,6 +487,154 @@ paths:
                 $ref: "#/components/schemas/BulkUpdateStatesMultiBrandResponse"
         "400":
           $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /states/{brandId}/{stateId}/signing-link:
+    post:
+      summary: Set signing link for a state
+      description: |
+        Set or update a signing link (e.g. DocuSign Superform URL) for a specific brand-state combination.
+
+        When set, the signing link replaces the default DocuSeal signing flow for applicants in that state.
+        If a signing link already exists for the given state and document type, the URL is updated in place.
+      operationId: setStateSigningLink
+      tags:
+        - Signing Links
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+        - name: stateId
+          in: path
+          required: true
+          description: State identifier (US state abbreviation or Canadian province code)
+          schema:
+            $ref: "#/components/schemas/State"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetSigningLinkRequest"
+            example:
+              url: "https://powerforms.docusign.net/abc123"
+              provider: "docusign"
+              document_type: "fdd"
+      responses:
+        "200":
+          description: Signing link updated (existing link for this state and document type)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SigningLinkResponse"
+        "201":
+          description: Signing link created (new link for this state and document type)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SigningLinkResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /states/{brandId}/signing-links/bulk:
+    post:
+      summary: Bulk set signing links for multiple states
+      description: |
+        Set signing links for multiple states and optionally a default signing link in one transactional operation.
+
+        - `default_url` sets or updates the default signing link on the external management organisation relationship.
+          This default is used as a fallback for states that don't have a state-specific signing link.
+        - `states` array sets per-state signing links. Each state can have a different URL.
+        - All changes are applied within a single database transaction. If any update fails, the entire operation is rolled back.
+
+        **Note:** The authenticated user must have write access to the brand.
+      operationId: bulkSetSigningLinks
+      tags:
+        - Signing Links
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkSetSigningLinksRequest"
+            example:
+              provider: "docusign"
+              document_type: "fdd"
+              default_url: "https://powerforms.docusign.net/default-form"
+              states:
+                - state_id: "ca"
+                  url: "https://powerforms.docusign.net/california-form"
+                - state_id: "ny"
+                  url: "https://powerforms.docusign.net/new-york-form"
+      responses:
+        "200":
+          description: Successfully set signing links
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkSetSigningLinksResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /states/{brandId}/signing-links:
+    get:
+      summary: Get all signing links for a brand
+      description: |
+        Retrieve the default signing link and all state-specific signing links for a brand.
+
+        Use this endpoint to verify which signing links are currently configured.
+        The `default` field contains the fallback signing link set on the external management organisation.
+        The `states` array contains all state-specific overrides.
+      operationId: getSigningLinksForBrand
+      tags:
+        - Signing Links
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        "200":
+          description: Successfully retrieved signing links
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetSigningLinksResponse"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
         "404":
@@ -1688,6 +1836,220 @@ components:
             locations: 5
             filing_activity: []
 
+    SigningLinkProvider:
+      type: string
+      enum:
+        - docusign
+      description: The signing platform provider
+
+    SigningLinkDocumentType:
+      type: string
+      enum:
+        - fdd
+        - franchise_agreement
+      description: The type of document the signing link is for
+
+    SetSigningLinkRequest:
+      type: object
+      required:
+        - url
+        - provider
+        - document_type
+      properties:
+        url:
+          type: string
+          format: uri
+          description: The full signing link URL (e.g. DocuSign PowerForm URL)
+          example: "https://powerforms.docusign.net/abc123"
+        provider:
+          $ref: "#/components/schemas/SigningLinkProvider"
+        document_type:
+          $ref: "#/components/schemas/SigningLinkDocumentType"
+
+    SigningLinkResponse:
+      type: object
+      required:
+        - id
+        - url
+        - provider
+        - document_type
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier of the signing link
+        url:
+          type: string
+          format: uri
+          description: The signing link URL
+        provider:
+          $ref: "#/components/schemas/SigningLinkProvider"
+        document_type:
+          $ref: "#/components/schemas/SigningLinkDocumentType"
+        created_at:
+          type: string
+          format: date-time
+          description: When the signing link was created
+        updated_at:
+          type: string
+          format: date-time
+          description: When the signing link was last updated
+      example:
+        id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        url: "https://powerforms.docusign.net/abc123"
+        provider: "docusign"
+        document_type: "fdd"
+        created_at: "2026-02-10T12:00:00+00:00"
+        updated_at: "2026-02-10T12:00:00+00:00"
+
+    BulkSigningLinkStateItem:
+      type: object
+      required:
+        - state_id
+        - url
+      properties:
+        state_id:
+          $ref: "#/components/schemas/State"
+        url:
+          type: string
+          format: uri
+          description: The signing link URL for this state
+          example: "https://powerforms.docusign.net/california-form"
+
+    BulkSetSigningLinksRequest:
+      type: object
+      required:
+        - provider
+        - document_type
+      properties:
+        provider:
+          $ref: "#/components/schemas/SigningLinkProvider"
+        document_type:
+          $ref: "#/components/schemas/SigningLinkDocumentType"
+        default_url:
+          type: string
+          format: uri
+          description: |
+            Default signing link URL to set on the external management organisation.
+            Used as a fallback for states that don't have a state-specific signing link.
+          example: "https://powerforms.docusign.net/default-form"
+        states:
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkSigningLinkStateItem"
+          description: Per-state signing link overrides
+
+    BulkSetSigningLinksResponse:
+      type: object
+      properties:
+        default:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            url:
+              type: string
+              format: uri
+          description: The default signing link (null if not set)
+        states:
+          type: array
+          items:
+            type: object
+            required:
+              - state_id
+              - id
+              - url
+            properties:
+              state_id:
+                $ref: "#/components/schemas/State"
+              id:
+                type: string
+                format: uuid
+              url:
+                type: string
+                format: uri
+          description: Per-state signing links that were set
+      example:
+        default:
+          id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          url: "https://powerforms.docusign.net/default-form"
+        states:
+          - state_id: "ca"
+            id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+            url: "https://powerforms.docusign.net/california-form"
+          - state_id: "ny"
+            id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
+            url: "https://powerforms.docusign.net/new-york-form"
+
+    GetSigningLinksResponse:
+      type: object
+      properties:
+        default:
+          type: object
+          nullable: true
+          required:
+            - id
+            - url
+            - provider
+            - document_type
+          properties:
+            id:
+              type: string
+              format: uuid
+            url:
+              type: string
+              format: uri
+            provider:
+              $ref: "#/components/schemas/SigningLinkProvider"
+            document_type:
+              $ref: "#/components/schemas/SigningLinkDocumentType"
+          description: The default signing link for the external management organisation (null if not set)
+        states:
+          type: array
+          items:
+            type: object
+            required:
+              - state_id
+              - id
+              - url
+              - provider
+              - document_type
+            properties:
+              state_id:
+                $ref: "#/components/schemas/State"
+              id:
+                type: string
+                format: uuid
+              url:
+                type: string
+                format: uri
+              provider:
+                $ref: "#/components/schemas/SigningLinkProvider"
+              document_type:
+                $ref: "#/components/schemas/SigningLinkDocumentType"
+          description: State-specific signing links
+      example:
+        default:
+          id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          url: "https://powerforms.docusign.net/default-form"
+          provider: "docusign"
+          document_type: "fdd"
+        states:
+          - state_id: "ca"
+            id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+            url: "https://powerforms.docusign.net/california-form"
+            provider: "docusign"
+            document_type: "fdd"
+          - state_id: "ny"
+            id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
+            url: "https://powerforms.docusign.net/new-york-form"
+            provider: "docusign"
+            document_type: "fdd"
+
     Error:
       type: object
       required:
@@ -1754,3 +2116,5 @@ tags:
   - name: Brands
   - name: States
     description: Operations related to brand and state specific franchising information
+  - name: Signing Links
+    description: Manage DocuSign Superform signing links per state. When a signing link is set, it replaces the default DocuSeal signing flow for applicants in that state.
