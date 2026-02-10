@@ -498,7 +498,7 @@ paths:
     post:
       summary: Set signing link for a state
       description: |
-        Set or update a signing link (e.g. DocuSign Superform URL) for a specific brand-state combination.
+        Set or update a signing link (e.g. DocuSign PowerForm URL) for a specific brand-state combination.
 
         When set, the signing link replaces the default DocuSeal signing flow for applicants in that state.
         If a signing link already exists for the given state and document type, the URL is updated in place.
@@ -2117,4 +2117,4 @@ tags:
   - name: States
     description: Operations related to brand and state specific franchising information
   - name: Signing Links
-    description: Manage DocuSign Superform signing links per state. When a signing link is set, it replaces the default DocuSeal signing flow for applicants in that state.
+    description: Manage DocuSign PowerForm signing links per state. When a signing link is set, it replaces the default DocuSeal signing flow for applicants in that state.
