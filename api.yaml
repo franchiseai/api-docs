@@ -607,6 +607,54 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /states/{brandId}/signing-links/default:
+    post:
+      summary: Set the default signing link for a brand
+      description: |
+        Set or update the organisation-level default signing link for a brand.
+
+        The default signing link is used as a fallback for any state that does not have a state-specific signing link configured.
+        If a default signing link already exists, the URL is updated in place.
+
+        **Note:** The brand must have an external management organisation configured. The authenticated user must have write access to the brand.
+      operationId: setDefaultSigningLink
+      tags:
+        - Signing Links
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: UUID of the brand
+          schema:
+            type: string
+            format: uuid
+            example: "123e4567-e89b-12d3-a456-426614174000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetSigningLinkRequest"
+            example:
+              url: "https://powerforms.docusign.net/default-form"
+              provider: "docusign"
+              document_type: "fdd"
+      responses:
+        "200":
+          description: Default signing link set or updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SigningLinkResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /states/{brandId}/signing-links:
     get:
       summary: Get all signing links for a brand
