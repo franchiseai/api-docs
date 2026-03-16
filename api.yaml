@@ -2180,24 +2180,6 @@ components:
             document_type: "fdd"
             powerform_roles: null
 
-    SigningEventSigner:
-      type: object
-      required:
-        - email
-        - name
-      properties:
-        email:
-          type: string
-          format: email
-          description: Signer's email address
-        name:
-          type: string
-          description: Signer's full name
-        signed_at:
-          type: string
-          format: date-time
-          description: When the signer signed the document
-
     SigningEventRequest:
       type: object
       required:
@@ -2205,16 +2187,21 @@ components:
         - fsai_reference_id
         - envelope_id
         - status
-        - signer
       properties:
         event_type:
           type: string
+          enum:
+            - envelope-completed
+            - envelope-voided
+            - envelope-declined
           description: The type of signing event
           example: "envelope-completed"
         fsai_reference_id:
           type: string
           format: uuid
-          description: The FSAI reference ID embedded in the PowerForm URL
+          description: |
+            The FSAI reference ID that was embedded in the PowerForm URL via the `EnvelopeField_fsai-reference-id` parameter.
+            This ID is created when the signing URL is constructed and links back to the applicant's signing request.
         envelope_id:
           type: string
           description: The DocuSign envelope ID
@@ -2227,16 +2214,14 @@ components:
             - viewed
             - started
           description: The current status of the envelope
-        signer:
-          $ref: "#/components/schemas/SigningEventSigner"
         completed_at:
           type: string
           format: date-time
-          description: When the envelope was completed
+          description: When the envelope was completed (required when status is `completed`)
         raw_event:
           type: object
           additionalProperties: true
-          description: Optional raw event data for audit purposes
+          description: Optional raw DocuSign Connect event data for audit purposes
 
     SigningEventResponse:
       type: object
