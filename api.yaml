@@ -690,6 +690,43 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /signing-events:
+    post:
+      summary: Report a signing event
+      operationId: receiveSigningEvent
+      description: |
+        Receive a normalized signing event from an external system (e.g. Spadea's DocuSign Connect handler).
+
+        When a DocuSign PowerForm is completed, voided, or declined, the external system forwards
+        the event to this endpoint. The `fsai_reference_id` in the payload is used to look up the
+        corresponding signing reference and update its status.
+
+        On completion, the applicant's FDD step is automatically marked as complete and the
+        FDD lockout period begins.
+      tags:
+        - Signing Events
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SigningEventRequest"
+      responses:
+        "200":
+          description: Event processed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SigningEventResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+
 components:
   securitySchemes:
     BearerAuth:
@@ -1897,6 +1934,19 @@ components:
         - franchise_agreement
       description: The type of document the signing link is for
 
+    PowerformRoles:
+      type: object
+      additionalProperties:
+        type: string
+      nullable: true
+      description: |
+        Maps role types to PowerForm role names as configured in the DocuSign template.
+        The `signer_1` key is used to construct the signer URL parameters.
+        Additional roles (viewer_1, viewer_2, etc.) are stored for future use.
+      example:
+        signer_1: "PrincipalSigner"
+        viewer_1: "ViewerOne"
+
     SetSigningLinkRequest:
       type: object
       required:
@@ -1913,6 +1963,8 @@ components:
           $ref: "#/components/schemas/SigningLinkProvider"
         document_type:
           $ref: "#/components/schemas/SigningLinkDocumentType"
+        powerform_roles:
+          $ref: "#/components/schemas/PowerformRoles"
 
     SigningLinkResponse:
       type: object
@@ -1921,6 +1973,7 @@ components:
         - url
         - provider
         - document_type
+        - powerform_roles
         - created_at
         - updated_at
       properties:
@@ -1936,6 +1989,8 @@ components:
           $ref: "#/components/schemas/SigningLinkProvider"
         document_type:
           $ref: "#/components/schemas/SigningLinkDocumentType"
+        powerform_roles:
+          $ref: "#/components/schemas/PowerformRoles"
         created_at:
           type: string
           format: date-time
@@ -1949,6 +2004,9 @@ components:
         url: "https://powerforms.docusign.net/abc123"
         provider: "docusign"
         document_type: "fdd"
+        powerform_roles:
+          signer_1: "PrincipalSigner"
+          viewer_1: "ViewerOne"
         created_at: "2026-02-10T12:00:00+00:00"
         updated_at: "2026-02-10T12:00:00+00:00"
 
@@ -1965,6 +2023,8 @@ components:
           format: uri
           description: The signing link URL for this state
           example: "https://powerforms.docusign.net/california-form"
+        powerform_roles:
+          $ref: "#/components/schemas/PowerformRoles"
 
     BulkSetSigningLinksRequest:
       type: object
@@ -1983,6 +2043,8 @@ components:
             Default signing link URL to set on the external management organisation.
             Used as a fallback for states that don't have a state-specific signing link.
           example: "https://powerforms.docusign.net/default-form"
+        default_powerform_roles:
+          $ref: "#/components/schemas/PowerformRoles"
         states:
           type: array
           items:
@@ -2002,6 +2064,8 @@ components:
             url:
               type: string
               format: uri
+            powerform_roles:
+              $ref: "#/components/schemas/PowerformRoles"
           description: The default signing link (null if not set)
         states:
           type: array
@@ -2020,18 +2084,26 @@ components:
               url:
                 type: string
                 format: uri
+              powerform_roles:
+                $ref: "#/components/schemas/PowerformRoles"
           description: Per-state signing links that were set
       example:
         default:
           id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
           url: "https://powerforms.docusign.net/default-form"
+          powerform_roles:
+            signer_1: "PrincipalSigner"
         states:
           - state_id: "ca"
             id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
             url: "https://powerforms.docusign.net/california-form"
+            powerform_roles:
+              signer_1: "PrincipalSigner"
+              viewer_1: "ViewerOne"
           - state_id: "ny"
             id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
             url: "https://powerforms.docusign.net/new-york-form"
+            powerform_roles: null
 
     GetSigningLinksResponse:
       type: object
@@ -2055,6 +2127,8 @@ components:
               $ref: "#/components/schemas/SigningLinkProvider"
             document_type:
               $ref: "#/components/schemas/SigningLinkDocumentType"
+            powerform_roles:
+              $ref: "#/components/schemas/PowerformRoles"
           description: The default signing link for the external management organisation (null if not set)
         states:
           type: array
@@ -2079,6 +2153,8 @@ components:
                 $ref: "#/components/schemas/SigningLinkProvider"
               document_type:
                 $ref: "#/components/schemas/SigningLinkDocumentType"
+              powerform_roles:
+                $ref: "#/components/schemas/PowerformRoles"
           description: State-specific signing links
       example:
         default:
@@ -2086,17 +2162,89 @@ components:
           url: "https://powerforms.docusign.net/default-form"
           provider: "docusign"
           document_type: "fdd"
+          powerform_roles:
+            signer_1: "PrincipalSigner"
         states:
           - state_id: "ca"
             id: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
             url: "https://powerforms.docusign.net/california-form"
             provider: "docusign"
             document_type: "fdd"
+            powerform_roles:
+              signer_1: "PrincipalSigner"
+              viewer_1: "ViewerOne"
           - state_id: "ny"
             id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
             url: "https://powerforms.docusign.net/new-york-form"
             provider: "docusign"
             document_type: "fdd"
+            powerform_roles: null
+
+    SigningEventSigner:
+      type: object
+      required:
+        - email
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+          description: Signer's email address
+        name:
+          type: string
+          description: Signer's full name
+        signed_at:
+          type: string
+          format: date-time
+          description: When the signer signed the document
+
+    SigningEventRequest:
+      type: object
+      required:
+        - event_type
+        - fsai_reference_id
+        - envelope_id
+        - status
+        - signer
+      properties:
+        event_type:
+          type: string
+          description: The type of signing event
+          example: "envelope-completed"
+        fsai_reference_id:
+          type: string
+          format: uuid
+          description: The FSAI reference ID embedded in the PowerForm URL
+        envelope_id:
+          type: string
+          description: The DocuSign envelope ID
+        status:
+          type: string
+          enum:
+            - completed
+            - voided
+            - declined
+            - viewed
+            - started
+          description: The current status of the envelope
+        signer:
+          $ref: "#/components/schemas/SigningEventSigner"
+        completed_at:
+          type: string
+          format: date-time
+          description: When the envelope was completed
+        raw_event:
+          type: object
+          additionalProperties: true
+          description: Optional raw event data for audit purposes
+
+    SigningEventResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      example:
+        success: true
 
     Error:
       type: object
@@ -2166,3 +2314,5 @@ tags:
     description: Operations related to brand and state specific franchising information
   - name: Signing Links
     description: Manage DocuSign PowerForm signing links per state. When a signing link is set, it replaces the default DocuSeal signing flow for applicants in that state.
+  - name: Signing Events
+    description: Receive signing events from external systems. Events track document signing status and trigger application workflow side effects.
