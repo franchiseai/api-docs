@@ -695,7 +695,7 @@ paths:
       summary: Report a signing event
       operationId: receiveSigningEvent
       description: |
-        Receive a normalized signing event from an external system (e.g. Spadea's DocuSign Connect handler).
+        Receive a normalized document signing event from an external system.
 
         When a DocuSign PowerForm is completed, voided, or declined, the external system forwards
         the event to this endpoint. The `fsai_reference_id` in the payload is used to look up the
