@@ -2185,7 +2185,6 @@ components:
       required:
         - event_type
         - fsai_reference_id
-        - envelope_id
         - status
       properties:
         event_type:
@@ -2204,7 +2203,10 @@ components:
             This ID is created when the signing URL is constructed and links back to the applicant's signing request.
         envelope_id:
           type: string
-          description: The DocuSign envelope ID
+          description: |
+            Optional DocuSign envelope ID. Not used for processing — the signing request is
+            identified via `fsai_reference_id`. Included for audit trail purposes and stored
+            alongside the event data.
         status:
           type: string
           enum:
@@ -2218,24 +2220,6 @@ components:
           type: string
           format: date-time
           description: When the envelope was completed (required when status is `completed`)
-        signer:
-          type: object
-          description: |
-            Optional signer information from the DocuSign envelope. Not used for processing —
-            the applicant is already identified via `fsai_reference_id`. Included for audit
-            trail purposes and stored alongside the event data.
-          properties:
-            email:
-              type: string
-              format: email
-              description: Signer's email address
-            name:
-              type: string
-              description: Signer's full name
-            signed_at:
-              type: string
-              format: date-time
-              description: When the signer signed the document
         raw_event:
           type: object
           additionalProperties: true
