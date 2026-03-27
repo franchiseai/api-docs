@@ -697,7 +697,7 @@ paths:
       description: |
         Receive a normalized document signing event from an external system.
 
-        When a DocuSign PowerForm is completed, voided, or declined, the external system forwards
+        When a DocuSign PowerForm event occurs (delivered, completed, voided, or declined), the external system forwards
         the event to this endpoint. The `fsai_reference_id` in the payload is used to look up the
         corresponding signing reference and update its status.
 
@@ -2193,6 +2193,7 @@ components:
             - envelope-completed
             - envelope-voided
             - envelope-declined
+            - envelope-delivered
           description: The type of signing event
           example: "envelope-completed"
         fsai_reference_id:
