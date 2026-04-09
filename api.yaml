@@ -80,6 +80,49 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /brands/match:
+    post:
+      summary: Match external brand names
+      description: |
+        Map external brand names to FranchiseSystems brands. Call this when activating an integration or when the external brand name changes.
+
+        Each match pairs a FranchiseSystems brand ID with the brand name as it appears in your system. This stored name is returned in the `GET /brands` response as `externalBrandName`, allowing you to detect name divergence on demand.
+      operationId: matchBrandNames
+      tags:
+        - Brands
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MatchBrandNameRequest"
+            example:
+              matches:
+                - brandId: "123e4567-e89b-12d3-a456-426614174000"
+                  externalBrandName: "Tom's Turkey Farm Co."
+                - brandId: "987fcdeb-e89b-12d3-a456-426614174000"
+                  externalBrandName: "Andrew's Apples (TM)"
+      responses:
+        "200":
+          description: Brand name matching results (per-brand success/failure)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchBrandNameResponse"
+              example:
+                results:
+                  - brandId: "123e4567-e89b-12d3-a456-426614174000"
+                    success: true
+                  - brandId: "987fcdeb-e89b-12d3-a456-426614174000"
+                    success: false
+                    error: "No external management record found for this brand"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /states/status/{brandId}:
     get:
       summary: Get state franchising status for a brand
@@ -907,6 +950,60 @@ components:
           nullable: true
           description: URL to the brand's logo image
           example: "https://example.com/logos/pizza-palace.png"
+        externalBrandName:
+          type: string
+          nullable: true
+          description: The brand name as known by the external managing organisation. Set via `POST /brands/match`.
+          example: "Pizza Palace Franchising Co."
+
+    MatchBrandNameRequest:
+      type: object
+      required:
+        - matches
+      properties:
+        matches:
+          type: array
+          description: Array of brand ID to external brand name mappings
+          items:
+            type: object
+            required:
+              - brandId
+              - externalBrandName
+            properties:
+              brandId:
+                type: string
+                format: uuid
+                description: The FranchiseSystems brand ID
+              externalBrandName:
+                type: string
+                minLength: 1
+                description: The brand name as it appears in your system
+          minItems: 1
+          maxItems: 100
+
+    MatchBrandNameResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          description: Per-brand result of the matching operation
+          items:
+            type: object
+            required:
+              - brandId
+              - success
+            properties:
+              brandId:
+                type: string
+                format: uuid
+              success:
+                type: boolean
+                description: Whether the external brand name was successfully stored
+              error:
+                type: string
+                description: Error message if the match failed (e.g. brand not found, access denied, no external management record)
 
     FilingActivity:
       type: object
