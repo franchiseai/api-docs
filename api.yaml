@@ -862,8 +862,28 @@ components:
         - none
         - filed_not_registered
         - filed_registered
-      description: Current registration status in the state
-      example: "none"
+      description: |
+        Current registration status for the brand in this state. This field
+        drives several pieces of UI in the FSAI dashboard with absolute
+        authority — set it to reflect the real-world status, and the dashboard
+        will respond accordingly.
+
+        - `filed_registered` — brand is registered and active in this state.
+          FSAI renders: green state icon in the detail panel, green map fill,
+          and (when `registration_expires_at` is set) a "Registered" / "Expiring
+          Soon" / "Expired" list tag depending on the expiry date.
+        - `none` — brand is not registered in this state. FSAI renders: red
+          state icon, red map fill when `registration_required` is true, and a
+          "Registration Required" list tag (only when `registration_required`
+          is true).
+        - `filed_not_registered` — **deprecated, do not use**. FSAI treats this
+          value as `none` (red) for safety. Send `none` or `filed_registered`
+          instead.
+
+        Related display fields the dashboard derives from this value plus
+        `registration_required` and `registration_expires_at`:
+        list-view tag, state-icon colour, and map fill colour.
+      example: "filed_registered"
 
     AgreementFeeTimeframe:
       type: string
