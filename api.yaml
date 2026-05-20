@@ -1191,6 +1191,24 @@ components:
           nullable: true
           description: Duration in days for FDD filing process
           example: 30
+        fdd_filing_type:
+          type: string
+          enum: ["initial", "renewal", "amendment", "exemption"]
+          nullable: true
+          description: |
+            Type of the current/most-recent FDD filing in this state.
+            Drives the "X Filing" copy shown in the FSAI dashboard's Filing
+            section (e.g. `renewal` → "Renewal Filing"). Choose the value that
+            matches the filing this state is currently reporting.
+          example: "renewal"
+        is_filing_open:
+          type: boolean
+          nullable: false
+          description: |
+            Whether a filing is currently open / in progress with the regulator
+            for this state. When true, FSAI surfaces a blue indicator on the
+            state icon to signal an in-progress filing.
+          example: false
         financial_assurance:
           type: string
           nullable: true
@@ -1682,6 +1700,21 @@ components:
           type: number
           nullable: true
           description: Duration in days for FDD filing process
+        fdd_filing_type:
+          type: string
+          enum: ["initial", "renewal", "amendment", "exemption"]
+          nullable: true
+          description: |
+            Type of the current/most-recent FDD filing in this state.
+            Drives the "X Filing" copy shown in the FSAI dashboard's Filing
+            section (e.g. `renewal` → "Renewal Filing"). Choose the value that
+            matches the filing this state is currently reporting.
+        is_filing_open:
+          type: boolean
+          description: |
+            Whether a filing is currently open / in progress with the regulator
+            for this state. When true, FSAI surfaces a blue indicator on the
+            state icon to signal an in-progress filing.
         financial_assurance:
           type: string
           nullable: true
