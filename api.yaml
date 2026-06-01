@@ -545,6 +545,10 @@ paths:
 
         When set, the signing link replaces the default DocuSeal signing flow for applicants in that state.
         If a signing link already exists for the given state and document type, the URL is updated in place.
+
+        Pass `url: null` to remove the state's signing-link override. The state then falls
+        back to the brand's default signing link (if one is configured). Removal returns
+        `{ "state_id": "<state>", "url": null }`.
       operationId: setStateSigningLink
       tags:
         - Signing Links
@@ -568,18 +572,22 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SetSigningLinkRequest"
+              $ref: "#/components/schemas/SetStateSigningLinkRequest"
             example:
               url: "https://powerforms.docusign.net/abc123"
               provider: "docusign"
               document_type: "fdd"
       responses:
         "200":
-          description: Signing link updated (existing link for this state and document type)
+          description: |
+            Signing link updated (existing link for this state and document type),
+            or removed when `url` was `null` (response is `{ "state_id", "url": null }`).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SigningLinkResponse"
+                oneOf:
+                  - $ref: "#/components/schemas/SigningLinkResponse"
+                  - $ref: "#/components/schemas/SigningLinkRemovedResponse"
         "201":
           description: Signing link created (new link for this state and document type)
           content:
@@ -604,6 +612,7 @@ paths:
         - `default_url` sets or updates the default signing link on the external management organisation relationship.
           This default is used as a fallback for states that don't have a state-specific signing link.
         - `states` array sets per-state signing links. Each state can have a different URL.
+          Pass `url: null` for a state to remove its override so it falls back to `default_url`.
         - All changes are applied within a single database transaction. If any update fails, the entire operation is rolled back.
 
         **Note:** The authenticated user must have write access to the brand.
@@ -634,6 +643,8 @@ paths:
                   url: "https://powerforms.docusign.net/california-form"
                 - state_id: "ny"
                   url: "https://powerforms.docusign.net/new-york-form"
+                - state_id: "tx"
+                  url: null
       responses:
         "200":
           description: Successfully set signing links
@@ -2116,6 +2127,44 @@ components:
         powerform_roles:
           $ref: "#/components/schemas/PowerformRoles"
 
+    SetStateSigningLinkRequest:
+      type: object
+      required:
+        - url
+        - provider
+        - document_type
+      properties:
+        url:
+          type: string
+          format: uri
+          nullable: true
+          description: |
+            The full signing link URL (e.g. DocuSign PowerForm URL), or `null` to remove
+            the state's override so it falls back to the brand's default signing link.
+          example: "https://powerforms.docusign.net/abc123"
+        provider:
+          $ref: "#/components/schemas/SigningLinkProvider"
+        document_type:
+          $ref: "#/components/schemas/SigningLinkDocumentType"
+        powerform_roles:
+          $ref: "#/components/schemas/PowerformRoles"
+
+    SigningLinkRemovedResponse:
+      type: object
+      required:
+        - state_id
+        - url
+      properties:
+        state_id:
+          $ref: "#/components/schemas/State"
+        url:
+          type: string
+          nullable: true
+          description: Always null — confirms the state's override was removed.
+      example:
+        state_id: "ca"
+        url: null
+
     SigningLinkResponse:
       type: object
       required:
@@ -2171,7 +2220,11 @@ components:
         url:
           type: string
           format: uri
-          description: The signing link URL for this state
+          nullable: true
+          description: |
+            The signing link URL for this state, or `null` to remove the state's override
+            so it falls back to `default_url`. Removed states are returned with null link
+            fields in the response.
           example: "https://powerforms.docusign.net/california-form"
         powerform_roles:
           $ref: "#/components/schemas/PowerformRoles"
@@ -2231,12 +2284,18 @@ components:
               id:
                 type: string
                 format: uuid
+                nullable: true
+                description: Null when the state's override was removed (url was null).
               url:
                 type: string
                 format: uri
+                nullable: true
+                description: Null when the state's override was removed.
               powerform_roles:
                 $ref: "#/components/schemas/PowerformRoles"
-          description: Per-state signing links that were set
+          description: |
+            Per-state results. States that were set return their link fields; states
+            removed via `url: null` return null link fields.
       example:
         default:
           id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
@@ -2253,6 +2312,10 @@ components:
           - state_id: "ny"
             id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
             url: "https://powerforms.docusign.net/new-york-form"
+            powerform_roles: null
+          - state_id: "tx"
+            id: null
+            url: null
             powerform_roles: null
 
     GetSigningLinksResponse:
@@ -2344,7 +2407,12 @@ components:
             - envelope-voided
             - envelope-declined
             - envelope-delivered
-          description: The type of signing event
+          description: |
+            The type of signing event.
+
+            **Deprecated:** `envelope-voided` is deprecated and will be removed in a future
+            version. It is still accepted for backward compatibility, but new integrations
+            should not rely on it.
           example: "envelope-completed"
         fsai_reference_id:
           type: string
