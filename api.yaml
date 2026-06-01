@@ -2128,26 +2128,23 @@ components:
           $ref: "#/components/schemas/PowerformRoles"
 
     SetStateSigningLinkRequest:
+      oneOf:
+        - $ref: "#/components/schemas/SetSigningLinkRequest"
+        - $ref: "#/components/schemas/RemoveStateSigningLinkRequest"
+
+    RemoveStateSigningLinkRequest:
       type: object
       required:
         - url
-        - provider
-        - document_type
       properties:
         url:
           type: string
-          format: uri
           nullable: true
-          description: |
-            The full signing link URL (e.g. DocuSign PowerForm URL), or `null` to remove
-            the state's override so it falls back to the brand's default signing link.
-          example: "https://powerforms.docusign.net/abc123"
-        provider:
-          $ref: "#/components/schemas/SigningLinkProvider"
-        document_type:
-          $ref: "#/components/schemas/SigningLinkDocumentType"
-        powerform_roles:
-          $ref: "#/components/schemas/PowerformRoles"
+          enum:
+            - null
+          description: Always null. Removes the state override so it falls back to the brand default signing link.
+      example:
+        url: null
 
     SigningLinkRemovedResponse:
       type: object
