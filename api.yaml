@@ -10,20 +10,31 @@ info:
     Authorization: Bearer YOUR_API_KEY
     ```
 
-    ### Obtaining an API Key
+    ### API Key Types
 
-    To obtain an API key:
+    Two kinds of API key can authenticate against this API. Both are used the same way — as a Bearer token, or in the `apiKey` body field of `POST /new-lead`.
+
+    #### Personal API keys
+
+    Attached to an individual user account and carry that account's permissions.
+
     1. Log into [Franchise Systems Ai](https://app.franchisesystems.ai/).
     2. Click your profile in the bottom left hand corner of the interface.
     3. Select "Settings".
-    3. Generate a new API key at the bottom of the page.
-    4. Store it securely - API keys are only shown once.
+    4. Generate a new API key at the bottom of the page.
+    5. Store it securely - API keys are only shown once.
 
-    ### API Key Management
+    - Only one key per account is valid at any given time; generating a new one revokes the previous key.
 
-    - API keys are attached to individual accounts, and have all the same permissions as the account they are attached to.
-    - Only one key per account is valid at any given time.
-    - Keys can be revoked by generating a new one.
+    #### Organization API keys
+
+    Belong to the organization rather than to a single user, so integrations keep working as individual team members come and go.
+
+    - Created and managed by an organization admin from the organization's settings.
+    - Carry the organization's brand permissions.
+    - An organization can hold multiple keys at once.
+    - Each key can be given an optional expiry date and can be revoked individually, without affecting the organization's other keys.
+    - Like personal keys, the value is only shown once at creation — store it securely.
 
     ### Rate Limiting
      - A general purpose rate limit of 1000 requests per 15 minute period is applied to this API
@@ -120,6 +131,143 @@ paths:
           $ref: "#/components/responses/BadRequestError"
         "401":
           $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /new-lead:
+    post:
+      summary: Create a lead
+      description: |
+        Capture a new **sales** or **marketing** lead for one of your matched brands.
+        Use this to forward leads collected in your own systems (web forms, landing
+        pages, partner integrations) into Franchise Systems Ai.
+
+        ### Authentication
+
+        Unlike the other endpoints in this API, `/new-lead` does **not** read the
+        `Authorization: Bearer` header. Pass your API key in the `apiKey` field of the
+        request body instead. The key must have the `sales.write` permission on the
+        target brand.
+
+        ### Brand resolution
+
+        Identify the brand with the `externalBrandId` that Franchise Systems Ai issues
+        to you. These identifiers are assigned and provided by Franchise Systems Ai
+        directly — they are not values you choose, and they are unrelated to the
+        `POST /brands/match` name mapping. If the identifier is not recognised, the
+        request fails with `404 Brand not found`.
+
+        ### Lead types
+
+        - `sales` — creates a sales lead (applicant). If a lead already exists for the
+          email on this brand, the request returns `409` and no lead is created.
+        - `marketing` — creates a marketing prospect. Set `triggerEmailSeries: true`
+          to start the email verification series.
+      operationId: createExternalLead
+      tags:
+        - Leads
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NewLeadRequest"
+            examples:
+              salesLead:
+                summary: Sales lead
+                value:
+                  apiKey: "YOUR_API_KEY"
+                  externalBrandId: "ext-brand-42"
+                  leadType: "sales"
+                  firstName: "Jane"
+                  lastName: "Doe"
+                  email: "jane.doe@example.com"
+                  phone: "+15551234567"
+                  utmParams: "utm_source=partner&utm_medium=referral&utm_campaign=spring"
+              marketingLead:
+                summary: Marketing lead with custom fields and verification series
+                value:
+                  apiKey: "YOUR_API_KEY"
+                  externalBrandId: "ext-brand-42"
+                  leadType: "marketing"
+                  firstName: "John"
+                  email: "john@example.com"
+                  triggerEmailSeries: true
+                  additionalFields: '[{"fieldId":"f_123","value":"Restaurant"},{"fieldId":"f_456","value":250000}]'
+      responses:
+        "200":
+          description: |
+            Lead accepted. Sales leads return a confirmation message; marketing leads
+            return an empty object.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewLeadResponse"
+              examples:
+                sales:
+                  summary: Sales lead created
+                  value:
+                    message: "Sales lead added"
+                marketing:
+                  summary: Marketing lead created
+                  value: {}
+        "400":
+          description: Invalid request (e.g. an unrecognised `leadType`)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Invalid lead type"
+        "401":
+          description: The API key has been revoked or has expired
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                revoked:
+                  summary: Revoked key
+                  value:
+                    error: "API key revoked"
+                expired:
+                  summary: Expired key
+                  value:
+                    error: "API key expired"
+        "403":
+          description: The API key does not have `sales.write` permission for this brand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Permission denied"
+        "404":
+          description: The API key was not found, or no brand matches `externalBrandId`
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              examples:
+                brandNotFound:
+                  summary: Unknown external brand
+                  value:
+                    error: "Brand not found"
+                apiKeyNotFound:
+                  summary: Unknown API key
+                  value:
+                    error: "API key not found"
+        "409":
+          description: |
+            A lead already exists for this email on the brand (sales leads only).
+            No lead is created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewLeadResponse"
+              example:
+                message: "Lead already exists for this email"
         "500":
           $ref: "#/components/responses/InternalServerError"
 
@@ -609,7 +757,7 @@ paths:
       description: |
         Set signing links for multiple states and optionally a default signing link in one transactional operation.
 
-        - `default_url` sets or updates the default signing link on the external management organisation relationship.
+        - `default_url` sets or updates the default signing link on the external management organization relationship.
           This default is used as a fallback for states that don't have a state-specific signing link.
         - `states` array sets per-state signing links. Each state can have a different URL.
           Pass `url: null` for a state to remove its override so it falls back to `default_url`.
@@ -665,12 +813,12 @@ paths:
     post:
       summary: Set the default signing link for a brand
       description: |
-        Set or update the organisation-level default signing link for a brand.
+        Set or update the organization-level default signing link for a brand.
 
         The default signing link is used as a fallback for any state that does not have a state-specific signing link configured.
         If a default signing link already exists, the URL is updated in place.
 
-        **Note:** The brand must have an external management organisation configured. The authenticated user must have write access to the brand.
+        **Note:** The brand must have an external management organization configured. The authenticated user must have write access to the brand.
       operationId: setDefaultSigningLink
       tags:
         - Signing Links
@@ -716,7 +864,7 @@ paths:
         Retrieve the default signing link and all state-specific signing links for a brand.
 
         Use this endpoint to verify which signing links are currently configured.
-        The `default` field contains the fallback signing link set on the external management organisation.
+        The `default` field contains the fallback signing link set on the external management organization.
         The `states` array contains all state-specific overrides.
       operationId: getSigningLinksForBrand
       tags:
@@ -984,7 +1132,7 @@ components:
         externalBrandName:
           type: string
           nullable: true
-          description: The brand name as known by the external managing organisation. Set via `POST /brands/match`.
+          description: The brand name as known by the external managing organization. Set via `POST /brands/match`.
           example: "Pizza Palace Franchising Co."
 
     MatchBrandNameRequest:
@@ -1035,6 +1183,77 @@ components:
               error:
                 type: string
                 description: Error message if the match failed (e.g. brand not found, access denied, no external management record)
+
+    NewLeadRequest:
+      type: object
+      required:
+        - apiKey
+        - externalBrandId
+        - leadType
+        - firstName
+        - email
+      properties:
+        apiKey:
+          type: string
+          description: |
+            Your Franchise Systems API key. Sent in the request body rather than the
+            `Authorization` header for this endpoint. Must have the `sales.write`
+            permission on the target brand.
+        externalBrandId:
+          type: string
+          description: |
+            Identifier for the target brand, assigned and provided to you by Franchise
+            Systems Ai directly. Contact Franchise Systems Ai to obtain the identifier
+            for each brand you integrate with — it is not a value you choose.
+          example: "ext-brand-42"
+        leadType:
+          type: string
+          enum:
+            - sales
+            - marketing
+          description: |
+            - `sales` — creates a sales lead (applicant).
+            - `marketing` — creates a marketing prospect.
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+        utmParams:
+          type: string
+          description: UTM tracking parameters associated with the lead, stored as provided.
+          example: "utm_source=partner&utm_medium=referral&utm_campaign=spring"
+        triggerEmailSeries:
+          type: boolean
+          default: false
+          description: |
+            When `true`, starts the email verification series for the lead. Applies to
+            marketing leads, which are created pending verification.
+        additionalFields:
+          type: string
+          description: |
+            Custom field submissions encoded as a **JSON string** — an array of
+            `{ "fieldId": string, "value": string | number | boolean | string[] }`
+            objects. Each `fieldId` corresponds to one of the brand's configured custom
+            form fields, and the field IDs are provided to you by Franchise Systems Ai
+            directly. Contact Franchise Systems Ai for the IDs of the fields you want to
+            populate.
+          example: '[{"fieldId":"f_123","value":"Restaurant"},{"fieldId":"f_456","value":250000}]'
+
+    NewLeadResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: |
+            Human-readable result. Present for sales leads (e.g. `"Sales lead added"`)
+            and for the duplicate-conflict case. Marketing leads return an empty object.
+      example:
+        message: "Sales lead added"
 
     FilingActivity:
       type: object
@@ -2240,7 +2459,7 @@ components:
           type: string
           format: uri
           description: |
-            Default signing link URL to set on the external management organisation.
+            Default signing link URL to set on the external management organization.
             Used as a fallback for states that don't have a state-specific signing link.
           example: "https://powerforms.docusign.net/default-form"
         default_powerform_roles:
@@ -2339,7 +2558,7 @@ components:
               $ref: "#/components/schemas/SigningLinkDocumentType"
             powerform_roles:
               $ref: "#/components/schemas/PowerformRoles"
-          description: The default signing link for the external management organisation (null if not set)
+          description: The default signing link for the external management organization (null if not set)
         states:
           type: array
           items:
@@ -2513,6 +2732,8 @@ components:
 
 tags:
   - name: Brands
+  - name: Leads
+    description: Capture sales and marketing leads collected in external systems.
   - name: States
     description: Operations related to brand and state specific franchising information
   - name: Signing Links
