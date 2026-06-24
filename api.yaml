@@ -161,8 +161,7 @@ paths:
 
         - `sales` — creates a sales lead (applicant). If a lead already exists for the
           email on this brand, the request returns `409` and no lead is created.
-        - `marketing` — creates a marketing prospect. Set `triggerEmailSeries: true`
-          to start the email verification series.
+        - `marketing` — creates a marketing prospect.
       operationId: createExternalLead
       tags:
         - Leads
@@ -184,16 +183,15 @@ paths:
                   lastName: "Doe"
                   email: "jane.doe@example.com"
                   phone: "+15551234567"
-                  utmParams: "utm_source=partner&utm_medium=referral&utm_campaign=spring"
+                  utmParams: '{"utm_source":"partner","utm_medium":"referral","utm_campaign":"spring"}'
               marketingLead:
-                summary: Marketing lead with custom fields and verification series
+                summary: Marketing lead with custom fields
                 value:
                   apiKey: "YOUR_API_KEY"
                   externalBrandId: "ext-brand-42"
                   leadType: "marketing"
                   firstName: "John"
                   email: "john@example.com"
-                  triggerEmailSeries: true
                   additionalFields: '[{"fieldId":"f_123","value":"Restaurant"},{"fieldId":"f_456","value":250000}]'
       responses:
         "200":
@@ -1225,14 +1223,11 @@ components:
           type: string
         utmParams:
           type: string
-          description: UTM tracking parameters associated with the lead, stored as provided.
-          example: "utm_source=partner&utm_medium=referral&utm_campaign=spring"
-        triggerEmailSeries:
-          type: boolean
-          default: false
           description: |
-            When `true`, starts the email verification series for the lead. Applies to
-            marketing leads, which are created pending verification.
+            UTM tracking parameters encoded as a **JSON string** — a flat object of UTM
+            keys to string values (e.g. `utm_source`, `utm_medium`, `utm_campaign`). FSAI
+            parses this to derive the lead's source.
+          example: '{"utm_source":"partner","utm_medium":"referral","utm_campaign":"spring"}'
         additionalFields:
           type: string
           description: |
