@@ -927,6 +927,219 @@ paths:
         "404":
           $ref: "#/components/responses/NotFoundError"
 
+  /webhooks/subscriptions:
+    servers:
+      - url: https://v2.api.franchisesystems.ai
+        description: Production server (webhook endpoints are served from the API root, not `/public`)
+    post:
+      summary: Create a webhook subscription
+      operationId: createWebhookSubscription
+      description: |
+        Subscribe a destination URL to a single webhook event for one brand. Once the
+        subscription exists, Franchise Systems Ai POSTs a `WebhookEventEnvelope` to
+        `targetUrl` every time the event occurs for that brand. See the
+        **Webhooks & Zapier** section introduction for the delivery contract, signing
+        scheme and retry behaviour.
+
+        Each subscription covers exactly **one event on one brand** — create one
+        subscription per event you want to receive. Store the returned `id`; it is what
+        you pass to `DELETE /webhooks/subscriptions/{id}` to unsubscribe.
+
+        The API key must have the `workspace-settings.write` permission on the target
+        brand.
+
+        `targetUrl` must use `https://` and resolve to a publicly reachable host —
+        URLs pointing at private or internal addresses are rejected.
+
+        Subscriptions created through this endpoint appear in the Franchise Systems Ai
+        dashboard under **Settings → Webhooks** for visibility (Zapier-managed ones are
+        marked with a purple "Zapier" badge), but they are expected to be managed
+        through this API rather than from the dashboard.
+      tags:
+        - Webhooks & Zapier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWebhookSubscriptionRequest"
+            example:
+              brandId: "123e4567-e89b-12d3-a456-426614174000"
+              targetUrl: "https://hooks.example.com/fsai/new-lead"
+              event: "lead.created"
+      responses:
+        "201":
+          description: Subscription created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateWebhookSubscriptionResponse"
+              example:
+                id: "9b2f1c34-5d6e-47a8-9b0c-1d2e3f4a5b6c"
+        "400":
+          description: Invalid request (e.g. an unknown event type, or a `targetUrl` that is not a public HTTPS URL)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Destination URL must use https://"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: The API key does not have `workspace-settings.write` permission for this brand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Permission denied"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /webhooks/subscriptions/{id}:
+    servers:
+      - url: https://v2.api.franchisesystems.ai
+        description: Production server (webhook endpoints are served from the API root, not `/public`)
+    delete:
+      summary: Delete a webhook subscription
+      operationId: deleteWebhookSubscription
+      description: |
+        Remove a webhook subscription. No further deliveries are made to its
+        destination URL.
+
+        This endpoint is **idempotent**: deleting a subscription that has already been
+        removed returns `200` rather than an error, so unsubscribe calls can safely be
+        retried.
+
+        If the subscription exists, the API key must have the
+        `workspace-settings.write` permission on its brand.
+      tags:
+        - Webhooks & Zapier
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The subscription id returned by `POST /webhooks/subscriptions`
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Subscription removed (or was already removed)
+          content:
+            application/json:
+              schema:
+                type: object
+              example: {}
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: The API key does not have `workspace-settings.write` permission for the subscription's brand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Permission denied"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /webhooks/samples/{brandId}/{event}:
+    servers:
+      - url: https://v2.api.franchisesystems.ai
+        description: Production server (webhook endpoints are served from the API root, not `/public`)
+    get:
+      summary: Get sample webhook payloads
+      operationId: listWebhookSamples
+      description: |
+        Return representative sample envelopes for a brand and event, in exactly the
+        shape deliveries will arrive in. Use this while building an integration to see
+        real field names and values before any live event fires — Zapier's
+        **Test trigger** step is backed by this endpoint.
+
+        Samples are built from the brand's recent leads where available; when the brand
+        has no suitable recent data, a synthetic placeholder sample is returned instead.
+
+        The API key must have the `sales.read` permission on the brand.
+      tags:
+        - Webhooks & Zapier
+      parameters:
+        - name: brandId
+          in: path
+          required: true
+          description: The brand to sample events for
+          schema:
+            type: string
+            format: uuid
+        - name: event
+          in: path
+          required: true
+          description: The event type to build samples for
+          schema:
+            $ref: "#/components/schemas/WebhookEventType"
+      responses:
+        "200":
+          description: Sample envelopes for the requested event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookSamplesResponse"
+        "400":
+          description: Unknown event type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Unknown webhook event type"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "403":
+          description: The API key does not have `sales.read` permission for this brand
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+              example:
+                error: "Permission denied"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /webhooks/zapier/me:
+    servers:
+      - url: https://v2.api.franchisesystems.ai
+        description: Production server (webhook endpoints are served from the API root, not `/public`)
+    get:
+      summary: List brands available for webhooks
+      operationId: listWebhookBrands
+      description: |
+        Return the brands the authenticated API key can access, as `{ id, name }`
+        pairs. The `id` values are what you pass as `brandId` when creating
+        subscriptions or requesting samples.
+
+        This endpoint doubles as a connection test — the Zapier integration calls it
+        to verify credentials and to populate its **Brand** dropdown.
+      tags:
+        - Webhooks & Zapier
+      responses:
+        "200":
+          description: Brands accessible to the API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZapierMeResponse"
+              example:
+                brands:
+                  - id: "123e4567-e89b-12d3-a456-426614174000"
+                    name: "Tom's Turkey Farm Co."
+                  - id: "987fcdeb-e89b-12d3-a456-426614174000"
+                    name: "Andrew's Apples"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
 components:
   securitySchemes:
     BearerAuth:
@@ -2673,6 +2886,257 @@ components:
           description: Error message
           example: "Invalid request"
 
+    WebhookEventType:
+      type: string
+      description: |
+        Event vocabulary for outbound webhooks. See the **Webhooks & Zapier** section
+        introduction for what each event means and when it fires.
+      enum:
+        - lead.created
+        - lead.imported
+        - lead.status.changed
+        - lead.deleted
+        - lead.meeting.booked
+        - lead.fdd.signed
+        - deal.created
+        - deal.status.changed
+        - lead.form.submitted
+        - lead.form.updated
+      example: "lead.created"
+
+    WebhookEventEnvelope:
+      type: object
+      description: |
+        The JSON body POSTed to a subscribed destination on every delivery. The same
+        shape is returned by `GET /webhooks/samples/{brandId}/{event}`.
+      required:
+        - event
+        - timestamp
+        - brandId
+        - correlationId
+        - data
+      properties:
+        event:
+          $ref: "#/components/schemas/WebhookEventType"
+        timestamp:
+          type: string
+          format: date-time
+          description: When the event occurred (UTC, ISO 8601)
+          example: "2026-07-01T14:30:00.000Z"
+        brandId:
+          type: string
+          format: uuid
+          description: The brand the event belongs to
+        correlationId:
+          type: string
+          description: |
+            Stable identifier for the logical event. Retried deliveries of the same
+            event carry the same `correlationId`, so it can be used to deduplicate.
+        data:
+          type: object
+          description: |
+            Event payload. Which keys are present depends on the event:
+
+            | Key | Present on |
+            | --- | --- |
+            | `lead` | Every `lead.*` event |
+            | `meeting` | `lead.meeting.booked` |
+            | `fdd` | `lead.fdd.signed` |
+            | `statusChange` | `lead.status.changed` |
+            | `form` | `lead.form.submitted`, `lead.form.updated` |
+            | `deal` | `deal.created`, `deal.status.changed` |
+          properties:
+            lead:
+              type: object
+              description: |
+                Summary of the lead the event relates to. All keys are always present;
+                values the lead does not have yet are `null`. Statuses are delivered as
+                their display names, never as internal ids.
+              required:
+                - id
+                - firstName
+                - lastName
+                - email
+                - phone
+                - status
+                - source
+                - brandName
+              properties:
+                id:
+                  type: string
+                  format: uuid
+                firstName:
+                  type: string
+                  nullable: true
+                lastName:
+                  type: string
+                  nullable: true
+                email:
+                  type: string
+                  nullable: true
+                phone:
+                  type: string
+                  nullable: true
+                status:
+                  type: string
+                  nullable: true
+                  description: The lead's current sales status, as its display name
+                source:
+                  type: string
+                  nullable: true
+                brandName:
+                  type: string
+                  nullable: true
+            meeting:
+              type: object
+              description: Meeting details. Present on `lead.meeting.booked`.
+              properties:
+                startTime:
+                  type: string
+                  format: date-time
+                endTime:
+                  type: string
+                  format: date-time
+                url:
+                  type: string
+                  description: Join link for the booked call
+            fdd:
+              type: object
+              description: FDD signing references. Present on `lead.fdd.signed`.
+              required:
+                - dealId
+              properties:
+                dealId:
+                  type: string
+                  nullable: true
+                  description: The deal the signed FDD belongs to, when one exists
+                assetId:
+                  type: string
+                  description: Reference to the signed document
+            statusChange:
+              type: object
+              description: |
+                The status transition, as display names. Present on
+                `lead.status.changed`.
+              required:
+                - to
+              properties:
+                from:
+                  type: string
+                  nullable: true
+                to:
+                  type: string
+            form:
+              type: object
+              description: |
+                The form involved. Present on `lead.form.submitted` and
+                `lead.form.updated`.
+              required:
+                - id
+                - name
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+            deal:
+              type: object
+              description: |
+                The deal involved. Present on `deal.created` and
+                `deal.status.changed`.
+              required:
+                - id
+              properties:
+                id:
+                  type: string
+                  format: uuid
+      example:
+        event: "lead.created"
+        timestamp: "2026-07-01T14:30:00.000Z"
+        brandId: "123e4567-e89b-12d3-a456-426614174000"
+        correlationId: "6f1d2c3b-4a5e-46f7-8a9b-0c1d2e3f4a5b"
+        data:
+          lead:
+            id: "5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d"
+            firstName: "Jane"
+            lastName: "Doe"
+            email: "jane.doe@example.com"
+            phone: "+15551234567"
+            status: "New"
+            source: "Website"
+            brandName: "Tom's Turkey Farm Co."
+
+    CreateWebhookSubscriptionRequest:
+      type: object
+      required:
+        - brandId
+        - targetUrl
+        - event
+      properties:
+        brandId:
+          type: string
+          format: uuid
+          description: |
+            The brand to watch. Use `GET /webhooks/zapier/me` to list the brands your
+            API key can access.
+        targetUrl:
+          type: string
+          format: uri
+          description: |
+            The URL that will receive event deliveries. Must use `https://` and resolve
+            to a publicly reachable host — URLs pointing at private or internal
+            addresses are rejected.
+          example: "https://hooks.example.com/fsai/new-lead"
+        event:
+          $ref: "#/components/schemas/WebhookEventType"
+
+    CreateWebhookSubscriptionResponse:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: |
+            The subscription id. Store it — it is what you pass to
+            `DELETE /webhooks/subscriptions/{id}` to unsubscribe.
+      example:
+        id: "9b2f1c34-5d6e-47a8-9b0c-1d2e3f4a5b6c"
+
+    WebhookSamplesResponse:
+      type: object
+      required:
+        - samples
+      properties:
+        samples:
+          type: array
+          description: |
+            Recent sample envelopes for the requested brand and event. May contain a
+            single synthetic placeholder when the brand has no suitable recent data.
+          items:
+            $ref: "#/components/schemas/WebhookEventEnvelope"
+
+    ZapierMeResponse:
+      type: object
+      required:
+        - brands
+      properties:
+        brands:
+          type: array
+          description: The brands the authenticated API key can access
+          items:
+            type: object
+            required:
+              - id
+              - name
+            properties:
+              id:
+                type: string
+                format: uuid
+              name:
+                type: string
+
   responses:
     UnauthorizedError:
       description: Authentication failed
@@ -2735,3 +3199,150 @@ tags:
     description: Manage DocuSign PowerForm signing links per state. When a signing link is set, it replaces the default DocuSeal signing flow for applicants in that state.
   - name: Signing Events
     description: Receive signing events from external systems. Events track document signing status and trigger application workflow side effects.
+  - name: Webhooks & Zapier
+    description: |
+      Outbound webhooks push lead and deal milestones out of Franchise Systems Ai as
+      they happen. Subscribe an HTTPS endpoint to an event and every occurrence for the
+      chosen brand is delivered to you as a signed JSON `POST` — no polling, and no
+      need to migrate data out of Franchise Systems Ai.
+
+      These endpoints also power the **FSAI Zapier integration** (see below), which
+      connects the same events to 8,000+ apps without writing any code.
+
+      > **Note:** unlike the rest of this API, the webhook endpoints are served from
+      > the API root — `https://v2.api.franchisesystems.ai/webhooks/...` — not from
+      > `/public`. The full URL is shown on each endpoint.
+
+      ## Events
+
+      | Event | Fires when |
+      | --- | --- |
+      | `lead.created` | A new lead is created |
+      | `lead.imported` | A lead is imported |
+      | `lead.status.changed` | A lead's sales status changes |
+      | `lead.deleted` | A lead is deleted |
+      | `lead.meeting.booked` | A lead books a call |
+      | `lead.fdd.signed` | A lead signs the FDD |
+      | `deal.created` | A deal is created |
+      | `deal.status.changed` | A deal moves to a different stage |
+      | `lead.form.submitted` | A lead submits a form |
+      | `lead.form.updated` | A lead updates a previously submitted form |
+
+      Each subscription covers one event on one brand. Subscribe to as many
+      event/brand combinations as you need — one API key can back any number of
+      subscriptions.
+
+      ## Delivery contract
+
+      Every delivery is an HTTPS `POST` to your destination URL with a JSON
+      `WebhookEventEnvelope` body:
+
+      ```json
+      {
+        "event": "lead.created",
+        "timestamp": "2026-07-01T14:30:00.000Z",
+        "brandId": "123e4567-e89b-12d3-a456-426614174000",
+        "correlationId": "6f1d2c3b-4a5e-46f7-8a9b-0c1d2e3f4a5b",
+        "data": {
+          "lead": {
+            "id": "5a4b3c2d-1e0f-4a9b-8c7d-6e5f4a3b2c1d",
+            "firstName": "Jane",
+            "lastName": "Doe",
+            "email": "jane.doe@example.com",
+            "phone": "+15551234567",
+            "status": "New",
+            "source": "Website",
+            "brandName": "Tom's Turkey Farm Co."
+          }
+        }
+      }
+      ```
+
+      `data` carries `lead` on every `lead.*` event, plus one extra key on milestone
+      events: `meeting` (call booked), `fdd` (FDD signed), `statusChange` (status
+      changed), `form` (form submitted/updated) or `deal` (deal events). The full
+      shape is documented on the `GET /webhooks/samples/{brandId}/{event}` response.
+
+      Respond with any `2xx` status to acknowledge a delivery. Redirects are not
+      followed.
+
+      ### Destination requirements
+
+      - The destination URL must use `https://`.
+      - The host must resolve to a publicly reachable address — URLs pointing at
+        private or internal hosts are rejected when the subscription is created and
+        again at delivery time.
+
+      ### Signatures
+
+      Every delivery is signed so you can verify it came from Franchise Systems Ai:
+
+      | Header | Value |
+      | --- | --- |
+      | `X-Webhook-Timestamp` | Unix timestamp (seconds) when the delivery was signed |
+      | `X-Webhook-Signature` | Hex HMAC-SHA256 of `` `${timestamp}.${rawBody}` `` using your destination's signing secret |
+      | `X-Webhook-Algorithm` | Always `sha256` |
+      | `X-Webhook-Idempotency-Key` | Stable per logical delivery — retries reuse the same key |
+
+      To verify, recompute the HMAC over the timestamp and the **exact raw request
+      body** and compare it to the signature header:
+
+      ```javascript
+      import crypto from "node:crypto";
+
+      const timestamp = req.header("X-Webhook-Timestamp");
+      const signature = req.header("X-Webhook-Signature");
+
+      const expected = crypto
+        .createHmac("sha256", signingSecret)
+        .update(`${timestamp}.${rawBody}`) // rawBody = unparsed request body string
+        .digest("hex");
+
+      const valid = crypto.timingSafeEqual(
+        Buffer.from(signature, "hex"),
+        Buffer.from(expected, "hex")
+      );
+      ```
+
+      Each destination has its own signing secret, shown in the Franchise Systems Ai
+      dashboard under **Settings → Webhooks**. Subscriptions created via
+      `POST /webhooks/subscriptions` do not return the secret in the API response;
+      consumers with unguessable destination URLs (such as Zapier) typically rely on
+      HTTPS plus the private URL instead of verifying signatures.
+
+      ### Retries and idempotency
+
+      Failed deliveries are retried automatically with increasing backoff — up to 4
+      retries per event. Retried deliveries reuse the same
+      `X-Webhook-Idempotency-Key` (and the same `correlationId` in the body), so
+      deduplicate on either if your handler is not naturally idempotent.
+
+      Every delivery attempt — including each retry, with its response status and any
+      error message — is visible in the Franchise Systems Ai dashboard under
+      **Settings → Webhooks**.
+
+      ## The Zapier integration
+
+      Franchise Systems Ai ships a private Zapier integration built on these
+      endpoints. It exposes three triggers — **New Lead**, **Call Booked** and
+      **FDD Signed** — so you can push leads and milestones into HubSpot, Zoho,
+      Salesforce, Slack, Google Sheets and 8,000+ other apps without writing code or
+      migrating your CRM.
+
+      - **Access** — the integration is invite-only and does not appear in Zapier's
+        public app directory. Request an invite from Franchise Systems Ai support;
+        you'll receive an email from Zapier, and after accepting, "FSAI" appears like
+        any other app when you build a Zap.
+      - **Connecting** — Zapier asks for an organization API key (created under
+        **Organization Settings → API Keys** in the dashboard; one key covers all your
+        brands) and an API Base URL, which should be left at its pre-filled default.
+      - **Subscriptions are managed by Zapier** — turning a Zap on subscribes
+        automatically and turning it off unsubscribes; there is nothing to clean up
+        manually. Zapier-managed subscriptions appear under **Settings → Webhooks**
+        with a purple "Zapier" badge.
+
+      The remaining events in the vocabulary above (e.g. `lead.status.changed`,
+      `deal.created`) are not exposed as Zapier triggers, but you can still route them
+      into Zapier by subscribing a Zapier **Catch Hook** URL via
+      `POST /webhooks/subscriptions`, or by creating a webhook from the dashboard
+      under **Settings → Webhooks**.
